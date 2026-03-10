@@ -362,9 +362,7 @@ void EventListener::onPlayerDie(const endstone::PlayerDeathEvent&event) {
 void EventListener::onPlayerPickup(const endstone::PlayerPickupItemEvent&event) {
     TianyanCore::LogData logData;
     const endstone::Player& player = event.getPlayer();
-    auto online_players = player.getServer().getOnlinePlayers();
-    if (const auto it = ranges::find(online_players,&player); it != online_players.end())
-    {
+    if (auto online_players = player.getServer().getOnlinePlayers(); ranges::find(online_players, &player) == online_players.end()) {
         return;
     }
     logData.uuid = yuhangle::Database::generate_uuid_v4();
@@ -391,8 +389,7 @@ void EventListener::onPlayerDropItem(const endstone::PlayerDropItemEvent& event)
     TianyanCore::LogData logData;
 
     const endstone::Player& player = event.getPlayer();
-    auto online_players = player.getServer().getOnlinePlayers();
-    if (const auto it = ranges::find(online_players,&player); it != online_players.end())
+    if (auto online_players = player.getServer().getOnlinePlayers(); ranges::find(online_players, &player) == online_players.end())
     {
         return;
     }
