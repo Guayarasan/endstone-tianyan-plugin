@@ -5,6 +5,14 @@
 #include "event_listener.h"
 #include "tianyan_protect.h"
 
+void EventListener::initOnlinePlayers()
+{
+    online_players_.clear();
+    for (const auto* p : plugin_.getServer().getOnlinePlayers()) {
+        online_players_.insert(p);
+    }
+}
+
 // 检查是否允许触发事件
 bool EventListener::canTriggerEvent(const string& playername) {
     const auto now = std::chrono::steady_clock::now();
@@ -362,7 +370,7 @@ void EventListener::onPlayerDie(const endstone::PlayerDeathEvent&event) {
 void EventListener::onPlayerPickup(const endstone::PlayerPickupItemEvent&event) {
     TianyanCore::LogData logData;
     const endstone::Player& player = event.getPlayer();
-    if (auto online_players = player.getServer().getOnlinePlayers(); ranges::find(online_players, &player) == online_players.end()) {
+    if (!online_players_.contains(&player)) {
         return;
     }
     logData.uuid = yuhangle::Database::generate_uuid_v4();
@@ -389,8 +397,7 @@ void EventListener::onPlayerDropItem(const endstone::PlayerDropItemEvent& event)
     TianyanCore::LogData logData;
 
     const endstone::Player& player = event.getPlayer();
-    if (auto online_players = player.getServer().getOnlinePlayers(); ranges::find(online_players, &player) == online_players.end())
-    {
+    if (!online_players_.contains(&player)) {
         return;
     }
     logData.uuid = yuhangle::Database::generate_uuid_v4();
@@ -415,11 +422,19 @@ void EventListener::onPlayerDropItem(const endstone::PlayerDropItemEvent& event)
 //玩家加入事件
 void EventListener::onPlayerJoin(const endstone::PlayerJoinEvent &event) {
     if (!event.getPlayer().asPlayer()) return;
+    online_players_.insert(&event.getPlayer());
     std::ostringstream out;
     out << endstone::ColorFormat::Yellow << Tran.getLocal("Player") << " " << event.getPlayer().getName() << " " << Tran.getLocal("joined server!")
     << " " <<Tran.getLocal("Device OS: ")<< event.getPlayer().getDeviceOS() << " " << Tran.getLocal("Device ID: ") << event.getPlayer().getDeviceId();
     plugin_.getServer().getLogger().info(out.str());
 }
+
+//玩家离开事件
+void EventListener::onPlayerLeave(const endstone::PlayerQuitEvent& event)
+{
+    online_players_.erase(&event.getPlayer());
+}
+
 
 //刷屏检测
 void EventListener::onPlayerSendMSG(const endstone::PlayerChatEvent &event) {

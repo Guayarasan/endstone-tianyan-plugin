@@ -13,6 +13,8 @@ class EventListener {
 public:
     explicit EventListener(endstone::Plugin& plugin) : plugin_(plugin) {}
 
+    void initOnlinePlayers();
+
     // 检查是否允许触发事件
     static bool canTriggerEvent(const std::string& playername);
 
@@ -36,12 +38,15 @@ public:
 
     static void onPlayerDie(const endstone::PlayerDeathEvent&event);
 
-    static void onPlayerPickup(const endstone::PlayerPickupItemEvent&event);
+    void onPlayerPickup(const endstone::PlayerPickupItemEvent&event);
 
-    static void onPlayerDropItem(const endstone::PlayerDropItemEvent& event);
+    void onPlayerDropItem(const endstone::PlayerDropItemEvent& event);
 
     //玩家加入事件
     void onPlayerJoin(const endstone::PlayerJoinEvent &event);
+
+    //玩家离开事件
+    void onPlayerLeave(const endstone::PlayerQuitEvent &event);
 
     //刷屏检测
     void onPlayerSendMSG(const endstone::PlayerChatEvent &event);
@@ -54,6 +59,7 @@ public:
 
 private:
     endstone::Plugin &plugin_;
+    std::unordered_set<const endstone::Player*> online_players_;
 };
 
 #endif //TIANYAN_EVENTLISTENER_H
