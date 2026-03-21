@@ -342,6 +342,7 @@ void TianyanPlugin::onEnable()
     registerEvent(&EventListener::onPlayerPickup, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerDropItem, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerJoin, *eventListener_, endstone::EventPriority::Monitor);
+    registerEvent(&EventListener::onPlayerLeave, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerSendMSG, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerSendCMD, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerTryJoin, *eventListener_, endstone::EventPriority::Monitor);
