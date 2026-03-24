@@ -451,9 +451,8 @@ _____   _
     //注册api
     const auto api_ptr = std::shared_ptr<ITianyanAPI>(this, [](ITianyanAPI*){
     });
-    // 2. 注册到服务管理器
+    // 注册到服务管理器
     getServer().getServiceManager().registerService("TianyanAPI", api_ptr, *this, endstone::ServicePriority::Normal);
-    getLogger().info("天眼 API 服务已注册到 ServiceManager");
 }
 
 void TianyanPlugin::onDisable()
