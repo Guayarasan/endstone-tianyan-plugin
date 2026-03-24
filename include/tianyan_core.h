@@ -9,29 +9,30 @@
 
 using namespace std;
 using TimePoint = std::chrono::steady_clock::time_point;
-//文件目录
-inline string dataPath = "plugins/tianyan_data";
-inline string language_path = "plugins/tianyan_data/language/";
-inline string dbPath = "plugins/tianyan_data/ty_data.db";
-inline string config_path = "plugins/tianyan_data/config.json";
-inline string ban_id_path = "plugins/tianyan_data/ban-id.json";
-//配置变量
-inline int max_message_in_10s;
-inline int max_command_in_10s;
-inline vector<string> no_log_mobs;
-inline bool enable_web_ui = false;
-// 存储每个玩家的上次触发时间
-inline std::unordered_map<string, TimePoint> lastTriggerTime;
-// 全局缓存：每个玩家的消息时间戳列表（仅保留最近10秒内的）
-inline std::unordered_map<string, std::vector<TimePoint>> playerMessageTimes;
-// 全局缓存：每个玩家的命令时间戳列表（仅保留最近10秒内的）
-inline std::unordered_map<string, std::vector<TimePoint>> playerCommandTimes;
-// 回溯状态缓存 - 存储需要标记为"reverted"的日志UUID和状态
-inline vector<pair<string, string>> revertStatusCache;
 
 class TianyanCore {
 public:
     explicit TianyanCore(yuhangle::Database database);
+    //文件目录
+    static inline const string dataPath = "plugins/tianyan_data";
+    static inline const string language_path = "plugins/tianyan_data/language/";
+    static inline const string dbPath = "plugins/tianyan_data/ty_data.db";
+    static inline const string config_path = "plugins/tianyan_data/config.json";
+    static inline const string ban_id_path = "plugins/tianyan_data/ban-id.json";
+    static inline string language_file = language_path + "en_US";
+    //配置变量
+    static inline int max_message_in_10s;
+    static inline int max_command_in_10s;
+    static inline vector<string> no_log_mobs;
+    static inline bool enable_web_ui = false;
+    // 存储每个玩家的上次触发时间
+    static inline std::unordered_map<string, TimePoint> lastTriggerTime;
+    // 全局缓存：每个玩家的消息时间戳列表（仅保留最近10秒内的）
+    static inline std::unordered_map<string, std::vector<TimePoint>> playerMessageTimes;
+    // 全局缓存：每个玩家的命令时间戳列表（仅保留最近10秒内的）
+    static inline std::unordered_map<string, std::vector<TimePoint>> playerCommandTimes;
+    // 回溯状态缓存 - 存储需要标记为"reverted"的日志UUID和状态
+    static inline vector<pair<string, string>> revertStatusCache;
 
     //记录数据结构
     struct LogData {

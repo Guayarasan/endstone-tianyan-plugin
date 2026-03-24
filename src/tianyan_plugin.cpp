@@ -5,6 +5,92 @@
 #include "tianyan_plugin.h"
 #include "version.h"
 #include <thread>
+#include "global.h"
+#include  "tianyan_core.h"
+
+// 为了方便在宏里调用，定义一个短函数
+inline std::string T(const std::string& key) {
+    return StaticTranslate::get(key);
+}
+
+//插件信息
+ENDSTONE_PLUGIN("tianyan_plugin", TIANYAN_PLUGIN_VERSION, TianyanPlugin)
+{
+    description = "A plugin for endstone to record behavior";
+    website = "https://github.com/yuhangle/endstone-tianyan-plugin";
+    authors = {"yuhangle"};
+
+
+        command("ty")
+            .description(T("Check behavior logs at your current location"))
+            .usages("/ty",
+                    "/ty <r: float> <time: float>",
+                    "/ty <r: float> <time: float> <source_id | source_name | target_id | target_name> <keywords: str>",
+                    "/ty <r: float> <time: float> <action> <block_break | block_place | entity_damage | player_right_click_block | player_right_click_entity | entity_bomb | block_break_bomb | piston_extend | piston_retract | entity_die | player_pickup_item | player_drop_item>"
+                    )
+            .permissions("ty.command.member");
+
+        command("tyback")
+            .description(T("Revert behaviors by time"))
+            .usages("/tyback",
+                    "/tyback <r: float> <time: float>",
+                    "/tyback <r: float> <time: float> <source_id | source_name | target_id | target_name> <keywords: str>",
+                    "/tyback <r: float> <time: float> <action> <block_break | block_place | player_right_click_block | block_break_bomb | entity_die>"
+                    )
+            .permissions("ty.command.op");
+
+        command("tys")
+            .description(T("Check behavior logs at server"))
+            .usages("/tys",
+                    "/tys <time: float>",
+                    "/tys <time: float> <source_id | source_name | target_id | target_name> <keywords: str>",
+                    "/tys <time: float> <action> <block_break | block_place | entity_damage | player_right_click_block | player_right_click_entity | entity_bomb | block_break_bomb | piston_extend | piston_retract | entity_die | player_pickup_item | player_drop_item>"
+                    )
+            .permissions("ty.command.op");
+
+        command("ban-id")
+            .description(T("Ban player by device id"))
+            .usages("/ban-id <device-id: str> [reason: str]"
+                    )
+            .permissions("ty.command.op");
+
+        command("unban-id")
+            .description(T("Unban player by device id"))
+            .usages("/unban-id <device-id: str>"
+                    )
+            .permissions("ty.command.op");
+
+        command("banlist-id")
+            .description(T("List baned player by device id"))
+            .usages("/banlist-id"
+                    )
+            .permissions("ty.command.op");
+
+        command("tyclean")
+            .description(T("Clean database"))
+            .usages("/tyclean <time: int>"
+                    )
+            .permissions("ty.command.op");
+
+        command("tyo")
+            .description(T("View inventory of online player"))
+            .usages("/tyo <player_name: player>"
+                    )
+            .permissions("ty.command.op");
+
+        command("density")
+            .description(T("Find the area with the highest entity density"))
+            .usages("/density [size: int]"
+                    )
+            .permissions("ty.command.op");
+
+    permission("ty.command.member")
+            .description(T("Allow users to use the /ty command."))
+            .default_(endstone::PermissionDefault::True);
+    permission("ty.command.op")
+        .description("OP command.")
+        .default_(endstone::PermissionDefault::Operator);
+}
 
     //数据目录和配置文件检查
 void TianyanPlugin::datafile_check() const {
@@ -16,53 +102,53 @@ void TianyanPlugin::datafile_check() const {
         {"no_log_mobs", {"minecraft:zombie_pigman","minecraft:zombie","minecraft:skeleton","minecraft:bogged","minecraft:slime"}}
     };
 
-    if (!(std::filesystem::exists(dataPath))) {
-        getLogger().info(Tran.getLocal("No data path,auto create"));
-        std::filesystem::create_directory(dataPath);
-        if (!(std::filesystem::exists(config_path))) {
-            if (std::ofstream file(config_path); file.is_open()) {
+    if (!(std::filesystem::exists(TianyanCore::dataPath))) {
+        getLogger().info(Tran->getLocal("No data path,auto create"));
+        std::filesystem::create_directory(TianyanCore::dataPath);
+        if (!(std::filesystem::exists(TianyanCore::config_path))) {
+            if (std::ofstream file(TianyanCore::config_path); file.is_open()) {
                 file << df_config.dump(4);
                 file.close();
-                getLogger().info(Tran.getLocal("Config file created"));
+                getLogger().info(Tran->getLocal("Config file created"));
             }
         }
-    } else if (std::filesystem::exists(dataPath)) {
-        if (!(std::filesystem::exists(config_path))) {
-            if (std::ofstream file(config_path); file.is_open()) {
+    } else if (std::filesystem::exists(TianyanCore::dataPath)) {
+        if (!(std::filesystem::exists(TianyanCore::config_path))) {
+            if (std::ofstream file(TianyanCore::config_path); file.is_open()) {
                 file << df_config.dump(4);
                 file.close();
-                getLogger().info(Tran.getLocal("Config file created"));
+                getLogger().info(Tran->getLocal("Config file created"));
             }
         } else {
             bool need_update = false;
             json loaded_config;
 
             // 加载现有配置文件
-            std::ifstream file(config_path);
+            std::ifstream file(TianyanCore::config_path);
             file >> loaded_config;
 
             // 检查配置完整性并更新
             for (auto& [key, value] : df_config.items()) {
                 if (!loaded_config.contains(key)) {
                     loaded_config[key] = value;
-                    getLogger().info(Tran.tr(Tran.getLocal("Config '{}' has update with default config"), key));
+                    getLogger().info(Tran->tr(Tran->getLocal("Config '{}' has update with default config"), key));
                     need_update = true;
                 }
             }
 
             // 如果需要更新配置文件，则进行写入
             if (need_update) {
-                if (std::ofstream outfile(config_path); outfile.is_open()) {
+                if (std::ofstream outfile(TianyanCore::config_path); outfile.is_open()) {
                     outfile << loaded_config.dump(4);
                     outfile.close();
-                    getLogger().info(Tran.getLocal("Config file update over"));
+                    getLogger().info(Tran->getLocal("Config file update over"));
                 }
             }
         }
     }
-    if (!std::filesystem::exists(language_path))
+    if (!std::filesystem::exists(TianyanCore::language_path))
     {
-        std::filesystem::create_directory(language_path);
+        std::filesystem::create_directory(TianyanCore::language_path);
     }
     // 数据迁移
     migrateOldBanData();
@@ -70,8 +156,8 @@ void TianyanPlugin::datafile_check() const {
 
 void TianyanPlugin::migrateOldBanData()
 {
-    filesystem::path oldFile = filesystem::path(dataPath) / "banidlist.json";
-    filesystem::path newFile = filesystem::path(dataPath) / "ban-id.json";
+    filesystem::path oldFile = filesystem::path(TianyanCore::dataPath) / "banidlist.json";
+    filesystem::path newFile = filesystem::path(TianyanCore::dataPath) / "ban-id.json";
 
     if (filesystem::exists(newFile)) {
         std::cout << "[Tianyan] New ban data exists, skip migration.\n";
@@ -128,7 +214,7 @@ void TianyanPlugin::migrateOldBanData()
 
 // 读取配置文件
 [[nodiscard]] json TianyanPlugin::read_config() const {
-    std::ifstream i(config_path);
+    std::ifstream i(TianyanCore::config_path);
     try {
         json j;
         i >> j;
@@ -244,16 +330,16 @@ void TianyanPlugin::onLoad()
 {
     getLogger().info("onLoad is called");
     //初始化目录
-    if (!(filesystem::exists(dataPath))) {
+    if (!(filesystem::exists(TianyanCore::dataPath))) {
         getLogger().info("No data path,auto create");
-        filesystem::create_directory(dataPath);
+        filesystem::create_directory(TianyanCore::dataPath);
     }
     //获取服务器语言
     const string sever_lang = getServer().getLanguage().getLocale();
-    language_file = dataPath + "/language/"+sever_lang+".json";
-    Tran = translate(language_file);
+    TianyanCore::language_file = TianyanCore::dataPath + "/language/"+sever_lang+".json";
+    Tran = std::make_unique<translate>(TianyanCore::language_file);
     //加载语言
-    const auto [fst, snd] = Tran.loadLanguage();
+    const auto [fst, snd] = Tran->loadLanguage();
     getLogger().info(snd);
 #ifdef __linux__
     namespace fs = std::filesystem;
@@ -262,7 +348,7 @@ void TianyanPlugin::onLoad()
         const fs::path currentPath = fs::current_path();
 
         // 子目录路径
-        const fs::path subdir = dbPath;
+        const fs::path subdir = TianyanCore::dbPath;
 
         // 拼接路径
         const fs::path fullPath = currentPath / subdir;
@@ -271,8 +357,8 @@ void TianyanPlugin::onLoad()
         const std::string finalPathStr = fullPath.string();
 
         // 使用完整路径重新初始化Database
-        Database = yuhangle::Database(finalPathStr);
-        tyCore = TianyanCore(Database);
+        Database = std::make_unique<yuhangle::Database>(finalPathStr);
+        tyCore = std::make_unique<TianyanCore>(*Database);
     }
     catch (const fs::filesystem_error& e) {
         std::cerr << "Filesystem error: " << e.what() << std::endl;
@@ -286,34 +372,31 @@ void TianyanPlugin::onLoad()
 void TianyanPlugin::onEnable()
 {
     getLogger().info("onEnable is called");
-    (void)Database.init_database();
+    (void)Database->init_database();
     datafile_check();
     //进行一个配置文件的读取
     json json_msg = read_config();
+    //预先设置默认值
+    TianyanCore::max_message_in_10s = 6;
+    TianyanCore::max_command_in_10s = 12;
+    TianyanCore::no_log_mobs = {"minecraft:zombie_pigman","minecraft:zombie","minecraft:skeleton","minecraft:bogged","minecraft:slime"};
     try {
         string lang = "en_US";
         if (!json_msg.contains("error")) {
-            max_message_in_10s = json_msg["10s_message_max"];
-            max_command_in_10s = json_msg["10s_command_max"];
-            no_log_mobs = json_msg["no_log_mobs"];
+            TianyanCore::max_message_in_10s = json_msg["10s_message_max"];
+            TianyanCore::max_command_in_10s = json_msg["10s_command_max"];
+            TianyanCore::no_log_mobs = json_msg["no_log_mobs"];
             lang = json_msg["language"];
-            language_file = language_path +lang+".json";
-            enable_web_ui = json_msg["enable_web_ui"];
+            TianyanCore::language_file = TianyanCore::language_path +lang+".json";
+            TianyanCore::enable_web_ui = json_msg["enable_web_ui"];
         } else {
-            getLogger().error(Tran.getLocal("Config file error!Use default config"));
-            max_message_in_10s = 6;
-            max_command_in_10s = 12;
-            no_log_mobs = {"minecraft:zombie_pigman","minecraft:zombie","minecraft:skeleton","minecraft:bogged","minecraft:slime"};
+            getLogger().error(Tran->getLocal("Config file error!Use default config"));
         }
     } catch (const std::exception& e) {
-        max_message_in_10s = 6;
-        max_command_in_10s = 12;
-        no_log_mobs = {"minecraft:zombie_pigman","minecraft:zombie","minecraft:skeleton","minecraft:bogged","minecraft:slime"};
-        getLogger().error(Tran.getLocal("Config file error!Use default config")+","+e.what());
+        getLogger().error(Tran->getLocal("Config file error!Use default config")+","+e.what());
     }
-    Tran = translate(language_file);
-    Tran.loadLanguage();
-    translate::checkLanguageCommon(language_file,dataPath+"/language/lang.json");
+    Tran = std::make_unique<translate>(TianyanCore::language_file);
+    Tran->loadLanguage();
     //定期写入
     getServer().getScheduler().runTaskTimer(*this, [&]() {logsCacheWrite();},0,60);
     //数据库清理后台检查
@@ -321,9 +404,9 @@ void TianyanPlugin::onEnable()
     //tyback命令后台检查
     getServer().getScheduler().runTaskTimer(*this,[&](){checkTybackSearchThread();},0,20);
     //完成外部类初始化
-    protect_ = std::make_unique<TianyanProtect>(*this);
-    eventListener_ = std::make_unique<EventListener>(*this);
-    menu_ = std::make_unique<Menu>(*this);
+    protect_ = std::make_unique<TianyanProtect>(this, Tran.get());
+    eventListener_ = std::make_unique<EventListener>(this, Tran.get());
+    menu_ = std::make_unique<Menu>(this, Tran.get());
     protect_->deviceIDBlacklistInit();
 
     //初始化在线玩家
@@ -355,12 +438,12 @@ _____   _
     )";
     getLogger().info(endstone::ColorFormat::Yellow+LOGO);
     const auto p_version = getServer().getPluginManager().getPlugin("tianyan_plugin")->getDescription().getVersion();
-    getLogger().info(endstone::ColorFormat::Yellow + Tran.getLocal("Tianyan Plugin Version: ") + p_version);
-    getLogger().info(endstone::ColorFormat::Yellow + Tran.getLocal("Repo: ")+"https://github.com/yuhangle/endstone-tianyan-plugin");
+    getLogger().info(endstone::ColorFormat::Yellow + Tran->getLocal("Tianyan Plugin Version: ") + p_version);
+    getLogger().info(endstone::ColorFormat::Yellow + Tran->getLocal("Repo: ")+"https://github.com/yuhangle/endstone-tianyan-plugin");
     getLogger().info("You can change the plugin’s language by editing the config file. Choose a language from the language folder.");
-    if (enable_web_ui)
+    if (TianyanCore::enable_web_ui)
     {
-        start_web_server(dbPath);
+        start_web_server(TianyanCore::dbPath);
 #ifdef _WIN32
         windows_print_webui_log = getServer().getScheduler().runTaskTimer(*this, [&]() {dump_webui_log_once();},0,20);
 #endif
@@ -371,7 +454,7 @@ void TianyanPlugin::onDisable()
 {
     getLogger().info("onDisable is called");
     logsCacheWrite();
-    if (enable_web_ui)
+    if (TianyanCore::enable_web_ui)
     {
         stop_web_server();
     }
@@ -385,25 +468,25 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
         // 菜单
         if (args.empty()) {
             if (!sender.asPlayer()) {
-                sender.sendErrorMessage(Tran.getLocal("Console not support menu"));
+                sender.sendErrorMessage(Tran->getLocal("Console not support menu"));
                 return false;
             }
-            Menu::tyMenu(*sender.asPlayer());
+            menu_->tyMenu(*sender.asPlayer());
         }
         else if (args.size() >= 2) {
             if (!sender.asPlayer()) {
-                sender.sendErrorMessage(Tran.getLocal("Console not support this command"));
+                sender.sendErrorMessage(Tran->getLocal("Console not support this command"));
                 return false;
             }
             try {
                 const double r = stod(args[0]);
                 const double time = stod(args[1]);
                 if (r > 100) {
-                    sender.sendErrorMessage(Tran.getLocal("The radius cannot be greater than 100"));
+                    sender.sendErrorMessage(Tran->getLocal("The radius cannot be greater than 100"));
                     return false;
                 }
                 if (time > 672) {
-                    sender.sendErrorMessage(Tran.getLocal("The time cannot be greater than 672"));
+                    sender.sendErrorMessage(Tran->getLocal("The time cannot be greater than 672"));
                     return false;
                 }
                 const string search_key_type = args.size() > 2 ? args[2] : "";
@@ -412,8 +495,8 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                 const double x = sender.asPlayer()->getLocation().getX();
                 const double y = sender.asPlayer()->getLocation().getY();
                 const double z = sender.asPlayer()->getLocation().getZ();
-                if (const auto searchData = tyCore.searchLog({"",time},x, y, z, r, world); searchData.empty()) {
-                    sender.sendErrorMessage(Tran.getLocal("No log found"));
+                if (const auto searchData = tyCore->searchLog({"",time},x, y, z, r, world); searchData.empty()) {
+                    sender.sendErrorMessage(Tran->getLocal("No log found"));
                 } else {
                     if (!search_key_type.empty() && !search_key.empty()) {
                         vector<TianyanCore::LogData> key_logData;
@@ -449,22 +532,22 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                             }
                         }
                         if (!key_logData.empty()) {
-                            Menu::showLogMenu(*sender.asPlayer(), key_logData);
-                            sender.sendMessage(endstone::ColorFormat::Yellow+Tran.getLocal("Display all logs about")+"` "+search_key+" `");
+                            menu_->showLogMenu(*sender.asPlayer(), key_logData);
+                            sender.sendMessage(endstone::ColorFormat::Yellow+Tran->getLocal("Display all logs about")+"` "+search_key+" `");
                             //提示数据过大
                             if (searchData.size() > 9999) {
-                                sender.sendErrorMessage(Tran.getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
+                                sender.sendErrorMessage(Tran->getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
                             }
                         }
                         else {
-                            sender.sendErrorMessage(Tran.getLocal("No log found"));
+                            sender.sendErrorMessage(Tran->getLocal("No log found"));
                         }
                     } else {
-                        Menu::showLogMenu(*sender.asPlayer(), searchData);
-                        sender.sendMessage(endstone::ColorFormat::Yellow+Tran.getLocal("Display all logs"));
+                        menu_->showLogMenu(*sender.asPlayer(), searchData);
+                        sender.sendMessage(endstone::ColorFormat::Yellow+Tran->getLocal("Display all logs"));
                         //提示数据过大
                         if (searchData.size() > 9999) {
-                            sender.sendErrorMessage(Tran.getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
+                            sender.sendErrorMessage(Tran->getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
                         }
                     }
                 }
@@ -480,25 +563,25 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
         // 菜单
         if (args.empty()) {
             if (!sender.asPlayer()) {
-                sender.sendErrorMessage(Tran.getLocal("Console not support menu"));
+                sender.sendErrorMessage(Tran->getLocal("Console not support menu"));
                 return false;
             }
-            Menu::tybackMenu(*sender.asPlayer());
+            menu_->tybackMenu(*sender.asPlayer());
         }
         else if (args.size() >=2) {
             if (!sender.asPlayer()) {
-                sender.sendErrorMessage(Tran.getLocal("Console not support this command"));
+                sender.sendErrorMessage(Tran->getLocal("Console not support this command"));
                 return false;
             }
             try {
                 //玩家有后台tyback操作未完成阻止使用
                 if (tyback_cache.player_name == sender.getName() && tyback_cache.status == false) {
-                    sender.sendErrorMessage(Tran.getLocal("A background operation is in progress. Please wait for it to complete"));
+                    sender.sendErrorMessage(Tran->getLocal("A background operation is in progress. Please wait for it to complete"));
                     return false;
                 }
                 const double r = stod(args[0]);
                 if (r > 100) {
-                    sender.sendErrorMessage(Tran.getLocal("The radius cannot be greater than 100"));
+                    sender.sendErrorMessage(Tran->getLocal("The radius cannot be greater than 100"));
                     return false;
                 }
                 const double time = stod(args[1]);
@@ -508,22 +591,22 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                 const double x = sender.asPlayer()->getLocation().getX();
                 const double y = sender.asPlayer()->getLocation().getY();
                 const double z = sender.asPlayer()->getLocation().getZ();
-                if (auto searchData = tyCore.searchLog({"",time},x, y, z, r, world); searchData.empty()) {
-                    sender.sendErrorMessage(Tran.getLocal("No log found"));
+                if (auto searchData = tyCore->searchLog({"",time},x, y, z, r, world); searchData.empty()) {
+                    sender.sendErrorMessage(Tran->getLocal("No log found"));
                 } else {
                     //数据过大，启动后台模式
                     if (searchData.size() > 9999 && tyback_cache.status == false) {
-                        sender.sendMessage(Tran.getLocal("Too many logs. Loading in the background to avoid lag — please wait"));
+                        sender.sendMessage(Tran->getLocal("Too many logs. Loading in the background to avoid lag — please wait"));
                         //不允许多个后台任务
                         if (tyback_cache.is_running) {
-                            sender.sendErrorMessage(Tran.getLocal("A background operation is in progress. Please wait for it to complete"));
+                            sender.sendErrorMessage(Tran->getLocal("A background operation is in progress. Please wait for it to complete"));
                             return false;
                         }
                         tyback_cache.player_name = sender.asPlayer()->getName();
                         tyback_cache.time = time;tyback_cache.r = r;
                         std::thread tyback_thread( [this,time, x, y, z, r, world]() {
                             tyback_cache.is_running = true;
-                            const auto searchData_ = tyCore.searchLog({"",time},x, y, z, r, world, true);
+                            const auto searchData_ = tyCore->searchLog({"",time},x, y, z, r, world, true);
                             tyback_cache.logDatas = searchData_;
                             tyback_cache.status = true;
                         });
@@ -574,7 +657,7 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                             cmd << "setblock " << pos << " " << logData.obj_id << logData.data;
                             // 将已回溯的事件UUID和状态添加到缓存中
                             if (getServer().dispatchCommand(wrapper_sender,cmd.str())) {
-                                revertStatusCache.emplace_back(logData.uuid, "reverted");
+                                TianyanCore::revertStatusCache.emplace_back(logData.uuid, "reverted");
                                 success_times++;
                             } else
                             {
@@ -603,7 +686,7 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                                 std::ostringstream cmd;
                                 cmd << "setblock " << pos << " " << logData.obj_id << hand_block[1];
                                 if (getServer().dispatchCommand(wrapper_sender,cmd.str())) {
-                                    revertStatusCache.emplace_back(logData.uuid, "reverted");
+                                    TianyanCore::revertStatusCache.emplace_back(logData.uuid, "reverted");
                                     success_times++;
                                 } else
                                 {
@@ -617,7 +700,7 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                             std::ostringstream cmd;
                             cmd << "setblock " << pos << " minecraft:air";
                             if (getServer().dispatchCommand(wrapper_sender,cmd.str())) {
-                                revertStatusCache.emplace_back(logData.uuid, "reverted");
+                                TianyanCore::revertStatusCache.emplace_back(logData.uuid, "reverted");
                                 success_times++;
                             } else
                             {
@@ -638,7 +721,7 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                             std::ostringstream cmd;
                             cmd << "summon " << obj_id << " " << pos;
                             if (getServer().dispatchCommand(wrapper_sender,cmd.str())) {
-                                revertStatusCache.emplace_back(logData.uuid, "reverted");
+                                TianyanCore::revertStatusCache.emplace_back(logData.uuid, "reverted");
                                 success_times++;
                             } else
                             {
@@ -650,12 +733,12 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                     updateRevertStatus();
                     auto green = endstone::ColorFormat::Green;
                     if (success_times > 0) {
-                        sender.sendMessage(green + Tran.getLocal("Revert times: ")+std::to_string(success_times+failed_times));
-                        sender.sendMessage(green + Tran.getLocal("Success: ")+std::to_string(success_times));
-                        sender.sendMessage(green + Tran.getLocal("Failed: ")+std::to_string(failed_times));
+                        sender.sendMessage(green + Tran->getLocal("Revert times: ")+std::to_string(success_times+failed_times));
+                        sender.sendMessage(green + Tran->getLocal("Success: ")+std::to_string(success_times));
+                        sender.sendMessage(green + Tran->getLocal("Failed: ")+std::to_string(failed_times));
                     } else {
-                        sender.sendMessage(green + Tran.getLocal("Nothing happened"));
-                        sender.sendMessage(green + Tran.getLocal("Failed: ")+std::to_string(failed_times));
+                        sender.sendMessage(green + Tran->getLocal("Nothing happened"));
+                        sender.sendMessage(green + Tran->getLocal("Failed: ")+std::to_string(failed_times));
                     }
                     //清理后台缓存
                     tyback_cache = {false};
@@ -671,14 +754,14 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
         // 菜单
         if (args.empty()) {
             if (!sender.asPlayer()) {
-                sender.sendErrorMessage(Tran.getLocal("Console not support menu"));
+                sender.sendErrorMessage(Tran->getLocal("Console not support menu"));
                 return false;
             }
-            Menu::tysMenu(*sender.asPlayer());
+            menu_->tysMenu(*sender.asPlayer());
         }
         else if (!args.empty()) {
             if (!sender.asPlayer()) {
-                sender.sendErrorMessage(Tran.getLocal("Console not support this command"));
+                sender.sendErrorMessage(Tran->getLocal("Console not support this command"));
                 return false;
             }
             try {
@@ -686,8 +769,8 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                 const string search_key_type = args.size() > 1 ? args[1] : "";
                 const string search_key = args.size() > 2 ? args[2] : "";
                 const string world = sender.asPlayer()->getLocation().getDimension().getName();
-                if (const auto searchData = tyCore.searchLog({"",time}); searchData.empty()) {
-                    sender.sendErrorMessage(Tran.getLocal("No log found"));
+                if (const auto searchData = tyCore->searchLog({"",time}); searchData.empty()) {
+                    sender.sendErrorMessage(Tran->getLocal("No log found"));
                 } else {
                     if (!search_key_type.empty() && !search_key.empty()) {
                         vector<TianyanCore::LogData> key_logData;
@@ -723,22 +806,22 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                             }
                         }
                         if (!key_logData.empty()) {
-                            Menu::showLogMenu(*sender.asPlayer(), key_logData);
-                            sender.sendMessage(endstone::ColorFormat::Yellow+Tran.getLocal("Display all logs about")+"` "+search_key+" `");
+                            menu_->showLogMenu(*sender.asPlayer(), key_logData);
+                            sender.sendMessage(endstone::ColorFormat::Yellow+Tran->getLocal("Display all logs about")+"` "+search_key+" `");
                             //提示数据过大
                             if (searchData.size() > 9999) {
-                                sender.sendErrorMessage(Tran.getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
+                                sender.sendErrorMessage(Tran->getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
                             }
                         }
                         else {
-                            sender.sendErrorMessage(Tran.getLocal("No log found"));
+                            sender.sendErrorMessage(Tran->getLocal("No log found"));
                         }
                     } else {
-                        Menu::showLogMenu(*sender.asPlayer(), searchData);
-                        sender.sendMessage(endstone::ColorFormat::Yellow+Tran.getLocal("Display all logs"));
+                        menu_->showLogMenu(*sender.asPlayer(), searchData);
+                        sender.sendMessage(endstone::ColorFormat::Yellow+Tran->getLocal("Display all logs"));
                         //提示数据过大
                         if (searchData.size() > 9999) {
-                            sender.sendErrorMessage(Tran.getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
+                            sender.sendErrorMessage(Tran->getLocal("Too many logs, please narrow the search range,display only 10,000 logs"));
                         }
                     }
                 }
@@ -764,9 +847,9 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
             auto status = protect_->BanDeviceID(banIDPlayer);
             if (sender.asPlayer()) {
                 if (status) {
-                    sender.sendMessage(Tran.tr(Tran.getLocal("Device ID {} banned successfully"),device_id));
+                    sender.sendMessage(Tran->tr(Tran->getLocal("Device ID {} banned successfully"),device_id));
                 } else {
-                    sender.sendErrorMessage(Tran.tr(Tran.getLocal("Error occurred while banning device ID {}: {}"), device_id, Tran.getLocal("View more in console")));
+                    sender.sendErrorMessage(Tran->tr(Tran->getLocal("Error occurred while banning device ID {}: {}"), device_id, Tran->getLocal("View more in console")));
                 }
             }
         }
@@ -776,52 +859,52 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
             const auto status = protect_->UnbanDeviceID(device_id);
             if (sender.asPlayer()) {
                 if (status) {
-                    sender.sendMessage(Tran.tr(Tran.getLocal("Device ID {} unbanned successfully"), device_id));
+                    sender.sendMessage(Tran->tr(Tran->getLocal("Device ID {} unbanned successfully"), device_id));
                 } else {
-                    sender.sendErrorMessage(Tran.tr(Tran.getLocal("Error occurred while unbanning device ID {}: {}"), device_id, Tran.getLocal("View more in console")));
+                    sender.sendErrorMessage(Tran->tr(Tran->getLocal("Error occurred while unbanning device ID {}: {}"), device_id, Tran->getLocal("View more in console")));
                 }
             }
         }
     } else if (command.getName() == "banlist-id") {
-        sender.sendMessage(Tran.getLocal("The list of baned device: "));
+        sender.sendMessage(Tran->getLocal("The list of baned device: "));
         if (BanIDPlayers.empty()) {
-            sender.sendMessage(Tran.getLocal("Nothing"));
+            sender.sendMessage(Tran->getLocal("Nothing"));
             return true;
         }
         for (auto &[player_name, device_id, reason, time] : BanIDPlayers) {
-            sender.sendMessage(Tran.tr(Tran.getLocal("Device ID: {}"), device_id));
-            sender.sendMessage(Tran.tr(Tran.getLocal("Player: {}"), player_name));
-            sender.sendMessage(Tran.tr(Tran.getLocal("Reason: {}"), reason.value_or("")));
-            sender.sendMessage(Tran.tr(Tran.getLocal("Time: {}"), time));
+            sender.sendMessage(Tran->tr(Tran->getLocal("Device ID: {}"), device_id));
+            sender.sendMessage(Tran->tr(Tran->getLocal("Player: {}"), player_name));
+            sender.sendMessage(Tran->tr(Tran->getLocal("Reason: {}"), reason.value_or("")));
+            sender.sendMessage(Tran->tr(Tran->getLocal("Time: {}"), time));
             sender.sendMessage("----------------------");
         }
     }
     else if (command.getName() == "tyclean") {
         if (!args.empty()) {
-            if (clean_data_status == 2) {
-                sender.sendErrorMessage(Tran.getLocal("A background operation is in progress. Please wait for it to complete"));
+            if (yuhangle::clean_data_status == 2) {
+                sender.sendErrorMessage(Tran->getLocal("A background operation is in progress. Please wait for it to complete"));
                 return false;
             }
             int hours = yuhangle::Database::stringToInt(args[0]);
             clean_data_sender_name = sender.getName();
-            sender.sendMessage(endstone::ColorFormat::Yellow+Tran.tr(Tran.getLocal("Start cleaning logs older than {} hours"), args[0]));
-            std::thread clean_thread([hours]() {
-                (void)Database.cleanDataBase(hours);
+            sender.sendMessage(endstone::ColorFormat::Yellow+Tran->tr(Tran->getLocal("Start cleaning logs older than {} hours"), args[0]));
+            std::thread clean_thread([this,hours]() {
+                (void)Database->cleanDataBase(hours);
             });
             clean_thread.detach();
         }
     }
     else if (command.getName() == "tyo") {
         if (!sender.asPlayer()) {
-            sender.sendErrorMessage(Tran.getLocal("Console not support menu"));
+            sender.sendErrorMessage(Tran->getLocal("Console not support menu"));
             return false;
         }
         if (!args.empty()) {
             const string& player_name = args[0];
             if (auto player = getServer().getPlayer(player_name)) {
-                Menu::showOnlinePlayerBag(sender, *player);
+                menu_->showOnlinePlayerBag(sender, *player);
             } else {
-                sender.sendErrorMessage(Tran.tr(Tran.getLocal("Player {} not found"), player_name));
+                sender.sendErrorMessage(Tran->tr(Tran->getLocal("Player {} not found"), player_name));
             }
         }
     }
@@ -839,15 +922,15 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                     "{}: {},\n"
                     "{}: {}",
                     endstone::ColorFormat::Yellow,
-                    Tran.getLocal("Highest density region in dimension"), result.dim.value(),
-                    Tran.getLocal("Midpoint coordinates"), result.mid_x.value(), result.mid_y.value(), result.mid_z.value(),
-                    Tran.getLocal("Entity count"), result.count.value(),
-                    Tran.getLocal("Most common entity"), result.entity_type.value(),
-                    Tran.getLocal("Random entity position"), result.entity_pos.value()
+                    Tran->getLocal("Highest density region in dimension"), result.dim.value(),
+                    Tran->getLocal("Midpoint coordinates"), result.mid_x.value(), result.mid_y.value(), result.mid_z.value(),
+                    Tran->getLocal("Entity count"), result.count.value(),
+                    Tran->getLocal("Most common entity"), result.entity_type.value(),
+                    Tran->getLocal("Random entity position"), result.entity_pos.value()
                 );
                 sender.sendMessage(content);
             } else {
-                sender.sendMessage(endstone::ColorFormat::Yellow + Tran.getLocal("No entities detected currently"));
+                sender.sendMessage(endstone::ColorFormat::Yellow + Tran->getLocal("No entities detected currently"));
             }
         } else {
             if (args.empty()) {
@@ -862,12 +945,13 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
 }
 
     //缓存写入机制
-void TianyanPlugin::logsCacheWrite() {
+void TianyanPlugin::logsCacheWrite() const
+{
     if (logDataCache.empty()) {
         return;
     }
     //避开数据清理
-    if (clean_data_status == 2) {
+    if (yuhangle::clean_data_status == 2) {
         return;
     }
     // 创建局部副本以避免在写入过程中数据被修改
@@ -880,9 +964,9 @@ void TianyanPlugin::logsCacheWrite() {
     }
 
     // 异步写入
-    std::thread logsCacheWrite_thread ([localCache]() mutable {
+    std::thread logsCacheWrite_thread ([this,localCache]() mutable {
         // 检查写入状态
-        if (tyCore.recordLogs(localCache)) {
+        if (tyCore->recordLogs(localCache)) {
             //超过10万仍无法写入，则清空缓存
             if (localCache.size() > 100000) {
                 std::cerr << "Unable to write a large volume of logs; cached logs will be discarded" << endl;
@@ -899,41 +983,41 @@ void TianyanPlugin::logsCacheWrite() {
 
 //检查异步的数据库清理状态
 void TianyanPlugin::checkDatabaseCleanStatus() const {
-    if (clean_data_status == 0) {
+    if (yuhangle::clean_data_status == 0) {
         return;
     }
     const auto player = getServer().getPlayer(clean_data_sender_name);
     const auto green = endstone::ColorFormat::Green;
-    if (clean_data_status == 1) {
+    if (yuhangle::clean_data_status == 1) {
         if (clean_data_sender_name!="Server" && player) {
-            player->sendMessage(green+Tran.getLocal("Database clean over"));
-            player->sendMessage(green+Tran.getLocal(clean_data_message[0]) + clean_data_message[1] + "s");
-            player->sendMessage(green+Tran.getLocal(clean_data_message[2])+clean_data_message[3]);
-            getLogger().info(green+Tran.getLocal("Database clean over"));
-            getLogger().info(green+Tran.getLocal(clean_data_message[0]) + clean_data_message[1] + "s");
-            getLogger().info(green+Tran.getLocal(clean_data_message[2])+clean_data_message[3]);
+            player->sendMessage(green+Tran->getLocal("Database clean over"));
+            player->sendMessage(green+Tran->getLocal(yuhangle::clean_data_message[0]) + yuhangle::clean_data_message[1] + "s");
+            player->sendMessage(green+Tran->getLocal(yuhangle::clean_data_message[2])+yuhangle::clean_data_message[3]);
+            getLogger().info(green+Tran->getLocal("Database clean over"));
+            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[0]) + yuhangle::clean_data_message[1] + "s");
+            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[2])+yuhangle::clean_data_message[3]);
         } else {
-            getLogger().info(green+Tran.getLocal("Database clean over"));
-            getLogger().info(green+Tran.getLocal(clean_data_message[0]) + clean_data_message[1] + "s");
-            getLogger().info(green+Tran.getLocal(clean_data_message[2])+clean_data_message[3]);
+            getLogger().info(green+Tran->getLocal("Database clean over"));
+            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[0]) + yuhangle::clean_data_message[1] + "s");
+            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[2])+yuhangle::clean_data_message[3]);
         }
-    } else if (clean_data_status == -1) {
+    } else if (yuhangle::clean_data_status == -1) {
         if (clean_data_sender_name!="Server" && player) {
-            player->sendErrorMessage(Tran.getLocal("Database clean error"));
-            getLogger().error(Tran.getLocal("Database clean error"));
-            for (const string& info : clean_data_message) {
+            player->sendErrorMessage(Tran->getLocal("Database clean error"));
+            getLogger().error(Tran->getLocal("Database clean error"));
+            for (const string& info : yuhangle::clean_data_message) {
                 player->sendErrorMessage(info);
                 getLogger().error(info);
             }
         } else {
-            getLogger().error(Tran.getLocal("Database clean error"));
-            for (const string& info : clean_data_message) {
+            getLogger().error(Tran->getLocal("Database clean error"));
+            for (const string& info : yuhangle::clean_data_message) {
                 getLogger().error(info);
             }
         }
     }
-    clean_data_status = 0;
-    clean_data_message.clear();
+    yuhangle::clean_data_status = 0;
+    yuhangle::clean_data_message.clear();
 }
 
 //检查tyback后台
@@ -942,7 +1026,7 @@ void TianyanPlugin::checkTybackSearchThread() {
         return;
     }
     if (const auto player = getServer().getPlayer(tyback_cache.player_name)) {
-        player->sendMessage(endstone::ColorFormat::Green+Tran.getLocal("Background log loading completed. You may now resume your operation"));
+        player->sendMessage(endstone::ColorFormat::Green+Tran->getLocal("Background log loading completed. You may now resume your operation"));
         std::ostringstream cmd;
         cmd << "tyback " << tyback_cache.r << " " << tyback_cache.time;
         tyback_cache.is_running = false;
@@ -953,109 +1037,58 @@ void TianyanPlugin::checkTybackSearchThread() {
 }
 
 // 批量更新回溯状态
-void TianyanPlugin::updateRevertStatus() {
-    if (revertStatusCache.empty()) {
+void TianyanPlugin::updateRevertStatus() const
+{
+    if (TianyanCore::revertStatusCache.empty()) {
         return;
     }
-    if (clean_data_status == 2) {
+    if (yuhangle::clean_data_status == 2) {
         return;
     }
     vector<pair<string, string>> localCache;
     {
         std::lock_guard lock(cacheMutex);  // 互斥锁
-        localCache.swap(revertStatusCache);
+        localCache.swap(TianyanCore::revertStatusCache);
     }
     //异步写入
-    std::thread updateRevertStatus_thread ([localCache]()mutable {
-        if (!Database.updateStatusesByUUIDs(localCache)) {
+    std::thread updateRevertStatus_thread ([this,localCache]()mutable {
+        if (!Database->updateStatusesByUUIDs(localCache)) {
             std::cerr << "Update revert status failed" << std::endl;
             if (localCache.size() > 100000) {
                 std::cerr << "Unable to write a large volume of logs; cached logs will be discarded" << endl;
                 localCache.clear();
             } else {
-                revertStatusCache.insert(revertStatusCache.begin(), localCache.begin(), localCache.end());
+                TianyanCore::revertStatusCache.insert(TianyanCore::revertStatusCache.begin(), localCache.begin(), localCache.end());
             }
         }
     });
     updateRevertStatus_thread.detach();
 }
 
+// 专门用于注册期的翻译
 
-//插件信息
-ENDSTONE_PLUGIN("tianyan_plugin", TIANYAN_PLUGIN_VERSION, TianyanPlugin)
-{
-    description = "A plugin for endstone to record behavior";
-    website = "https://github.com/yuhangle/endstone-tianyan-plugin";
-    authors = {"yuhangle"};
+std::string StaticTranslate::get(const std::string& key) {
+    try {
+        namespace fs = std::filesystem;
+        const std::string config_path = "plugins/tianyan_data/config.json";
+        const std::string lang_dir = "plugins/tianyan_data/language/";
+        std::string lang = "en_US";
+        if (fs::exists(config_path)) {
+            std::ifstream i(config_path);
+            json j;
+            i >> j;
+            if (j.contains("language")) {
+                lang = j["language"].get<std::string>();
+            }
+        }
 
-
-        command("ty")
-            .description(Tran.getLocal("Check behavior logs at your current location"))
-            .usages("/ty",
-                    "/ty <r: float> <time: float>",
-                    "/ty <r: float> <time: float> <source_id | source_name | target_id | target_name> <keywords: str>",
-                    "/ty <r: float> <time: float> <action> <block_break | block_place | entity_damage | player_right_click_block | player_right_click_entity | entity_bomb | block_break_bomb | piston_extend | piston_retract | entity_die | player_pickup_item | player_drop_item>"
-                    )
-            .permissions("ty.command.member");
-
-        command("tyback")
-            .description(Tran.getLocal("Revert behaviors by time"))
-            .usages("/tyback",
-                    "/tyback <r: float> <time: float>",
-                    "/tyback <r: float> <time: float> <source_id | source_name | target_id | target_name> <keywords: str>",
-                    "/tyback <r: float> <time: float> <action> <block_break | block_place | player_right_click_block | block_break_bomb | entity_die>"
-                    )
-            .permissions("ty.command.op");
-
-        command("tys")
-            .description(Tran.getLocal("Check behavior logs at server"))
-            .usages("/tys",
-                    "/tys <time: float>",
-                    "/tys <time: float> <source_id | source_name | target_id | target_name> <keywords: str>",
-                    "/tys <time: float> <action> <block_break | block_place | entity_damage | player_right_click_block | player_right_click_entity | entity_bomb | block_break_bomb | piston_extend | piston_retract | entity_die | player_pickup_item | player_drop_item>"
-                    )
-            .permissions("ty.command.op");
-
-        command("ban-id")
-            .description(Tran.getLocal("Ban player by device id"))
-            .usages("/ban-id <device-id: str> [reason: str]"
-                    )
-            .permissions("ty.command.op");
-
-        command("unban-id")
-            .description(Tran.getLocal("Unban player by device id"))
-            .usages("/unban-id <device-id: str>"
-                    )
-            .permissions("ty.command.op");
-
-        command("banlist-id")
-            .description(Tran.getLocal("List baned player by device id"))
-            .usages("/banlist-id"
-                    )
-            .permissions("ty.command.op");
-
-        command("tyclean")
-            .description(Tran.getLocal("Clean database"))
-            .usages("/tyclean <time: int>"
-                    )
-            .permissions("ty.command.op");
-
-        command("tyo")
-            .description(Tran.getLocal("View inventory of online player"))
-            .usages("/tyo <player_name: player>"
-                    )
-            .permissions("ty.command.op");
-
-        command("density")
-            .description(Tran.getLocal("Find the area with the highest entity density"))
-            .usages("/density [size: int]"
-                    )
-            .permissions("ty.command.op");
-
-    permission("ty.command.member")
-            .description("Allow users to use the /ty command.")
-            .default_(endstone::PermissionDefault::True);
-    permission("ty.command.op")
-        .description("OP command.")
-        .default_(endstone::PermissionDefault::Operator);
+        if (std::string lang_file = lang_dir + lang + ".json"; fs::exists(lang_file)) {
+            std::ifstream f(lang_file);
+            if (json res = json::parse(f); res.contains(key)) {
+                return res[key].get<std::string>();
+            }
+        }
+    } catch (...) {
+    }
+    return key;
 }

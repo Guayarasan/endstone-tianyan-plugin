@@ -6,15 +6,22 @@
 #include <endstone/plugin/plugin.h>
 #include <string>
 #include <fstream>
-#include "global.h"
 #include "database.hpp"
-#include "tianyan_core.h"
 #include "tianyan_protect.h"
 #include "event_listener.h"
 #include "menu.h"
+#include "translate.hpp"
+
+class StaticTranslate
+{
+public:
+    static std::string get(const std::string& key);
+};
 
 class TianyanPlugin : public endstone::Plugin {
 public:
+    //语言
+    static inline std::unique_ptr<translate> Tran;
     //数据目录和配置文件检查
     void datafile_check() const;
 
@@ -33,7 +40,7 @@ public:
     bool onCommand(endstone::CommandSender &sender, const endstone::Command &command, const std::vector<std::string> &args) override;
 
         //缓存写入机制
-    static void logsCacheWrite();
+    void logsCacheWrite() const;
 
     //检查异步的数据库清理状态
     void checkDatabaseCleanStatus() const;
@@ -42,9 +49,12 @@ public:
     void checkTybackSearchThread();
 
     // 批量更新回溯状态
-    static void updateRevertStatus();
+    void updateRevertStatus() const;
 
 private:
+    //初始化其它实例
+    std::unique_ptr<yuhangle::Database> Database;
+    std::unique_ptr<TianyanCore> tyCore;
     std::unique_ptr<TianyanProtect> protect_;
     std::unique_ptr<EventListener> eventListener_;
     std::unique_ptr<Menu> menu_;

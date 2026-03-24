@@ -4,6 +4,13 @@
 
 #include "menu.h"
 #include "tianyan_protect.h"
+#include <tianyan_plugin.h>
+#include <translate.hpp>
+
+Menu::Menu(TianyanPlugin* tianyan, translate* tran)
+    :plugin_(*tianyan), tran_(tran)
+{}
+
 
 //日志展示菜单
 void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::LogData>& logDatas, const int page) {
@@ -13,7 +20,7 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
     const int currentPage = std::min(page, std::max(0, totalPages - 1)); // 确保当前页在有效范围内
 
     endstone::ActionForm logMenu;
-    logMenu.setTitle(fmt::format("{} - {} {}/{} {}", Tran.getLocal("Logs"), Tran.getLocal("The"),currentPage + 1, std::max(1, totalPages),Tran.getLocal("Page")));
+    logMenu.setTitle(fmt::format("{} - {} {}/{} {}", tran_->getLocal("Logs"), tran_->getLocal("The"),currentPage + 1, std::max(1, totalPages),tran_->getLocal("Page")));
 
     string showLogs;
 
@@ -34,37 +41,37 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
 
             // 名字不为空时添加源名称
             if (!logData.name.empty()) {
-                logFields.emplace_back(Tran.getLocal("Source Name"), logData.name);
+                logFields.emplace_back(tran_->getLocal("Source Name"), logData.name);
             }
 
             // 根据是否是玩家添加不同类型的信息
             if (logData.id == "minecraft:player") {
-                logFields.emplace_back(Tran.getLocal("Source Type"), Tran.getLocal("Player"));
+                logFields.emplace_back(tran_->getLocal("Source Type"), tran_->getLocal("Player"));
             }
             else if (!logData.id.empty()){
-                logFields.emplace_back(Tran.getLocal("Source ID"), logData.id);
+                logFields.emplace_back(tran_->getLocal("Source ID"), logData.id);
             }
 
             // 添加行为类型
-            logFields.emplace_back(Tran.getLocal("Action"), Tran.getLocal(logData.type));
+            logFields.emplace_back(tran_->getLocal("Action"), tran_->getLocal(logData.type));
 
             // 添加位置信息
-            logFields.emplace_back(Tran.getLocal("Position"),
+            logFields.emplace_back(tran_->getLocal("Position"),
                                   fmt::format("{:.2f},{:.2f},{:.2f}", logData.pos_x, logData.pos_y, logData.pos_z));
 
             //添加维度信息
-            logFields.emplace_back(Tran.getLocal("Dimension"), logData.world);
+            logFields.emplace_back(tran_->getLocal("Dimension"), logData.world);
 
             // 添加时间信息
-            logFields.emplace_back(Tran.getLocal("Time"), TianyanCore::timestampToString(logData.time));
+            logFields.emplace_back(tran_->getLocal("Time"), TianyanCore::timestampToString(logData.time));
 
             // 根据目标名称和ID是否存在添加相应信息
             if (!logData.obj_name.empty()) {
-                logFields.emplace_back(Tran.getLocal("Target Name"), Tran.getLocal(logData.obj_name));
+                logFields.emplace_back(tran_->getLocal("Target Name"), tran_->getLocal(logData.obj_name));
             }
 
             if (!logData.obj_id.empty()) {
-                logFields.emplace_back(Tran.getLocal("Target ID"), logData.obj_id);
+                logFields.emplace_back(tran_->getLocal("Target ID"), logData.obj_id);
             }
 
             // 添加数据信息
@@ -72,22 +79,22 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
                 //对手持物品交互进行处理
                 if (logData.type == "player_right_click_block") {
                     auto hand_block = yuhangle::Database::splitString(logData.data);
-                    logFields.emplace_back(Tran.getLocal("Item in Hand"), Tran.getLocal(hand_block[0]));
+                    logFields.emplace_back(tran_->getLocal("Item in Hand"), tran_->getLocal(hand_block[0]));
                     if (hand_block[1] != "[]") {
-                        logFields.emplace_back(Tran.getLocal("Data"), hand_block[1]);
+                        logFields.emplace_back(tran_->getLocal("Data"), hand_block[1]);
                     }
                 } else {
                     if (logData.data != "[]") {
-                        logFields.emplace_back(Tran.getLocal("Data"), logData.data);
+                        logFields.emplace_back(tran_->getLocal("Data"), logData.data);
                     }
                 }
             }
 
             //事件是否取消或被恢复
             if (logData.status == "canceled") {
-                logFields.emplace_back(Tran.getLocal("Status"), Tran.getLocal("This event has been canceled"));
+                logFields.emplace_back(tran_->getLocal("Status"), tran_->getLocal("This event has been canceled"));
             } else if (logData.status == "reverted") {
-                logFields.emplace_back(Tran.getLocal("Status"), Tran.getLocal("This event has been reverted"));
+                logFields.emplace_back(tran_->getLocal("Status"), tran_->getLocal("This event has been reverted"));
             }
 
             // 格式化输出
@@ -99,7 +106,7 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
         }
     } else {
         // 没有日志数据
-        showLogs = Tran.getLocal("No log found");
+        showLogs = tran_->getLocal("No log found");
     }
 
     logMenu.setContent(endstone::ColorFormat::Yellow + showLogs);
@@ -110,8 +117,8 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
     // 添加上一页按钮（如果有多页）
     if (totalPages > 1) {
         endstone::Button pageUp;
-        pageUp.setText(Tran.getLocal("Page Up"));
-        pageUp.setOnClick([=, &player](endstone::Player*) {
+        pageUp.setText(tran_->getLocal("Page Up"));
+        pageUp.setOnClick([this, &player, currentPage, logDatas, totalPages](endstone::Player*) {
             // 如果是第一页，则跳转到最后一页；否则上一页
             const int prevPage = (currentPage == 0) ? (totalPages - 1) : (currentPage - 1);
             showLogMenu(player, logDatas, prevPage);
@@ -122,8 +129,8 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
     // 添加下一页按钮（如果有多页）
     if (totalPages > 1) {
         endstone::Button pageDown;
-        pageDown.setText(Tran.getLocal("Page Down"));
-        pageDown.setOnClick([=, &player](endstone::Player*) {
+        pageDown.setText(tran_->getLocal("Page Down"));
+        pageDown.setOnClick([this, &player,currentPage, totalPages, logDatas](endstone::Player*) {
             // 如果是最后一页，则回到第一页；否则下一页
             const int nextPage = (currentPage + 1) % totalPages;
             showLogMenu(player, logDatas, nextPage);
@@ -136,20 +143,21 @@ void Menu::showLogMenu(endstone::Player &player, const std::vector<TianyanCore::
 }
 
 //tyback菜单
-void Menu::tybackMenu(const endstone::Player &sender) {
+void Menu::tybackMenu(const endstone::Player &sender) const
+{
     endstone::ModalForm tyMenu;
-    tyMenu.setTitle(Tran.getLocal("Revert Menu"));
+    tyMenu.setTitle(tran_->getLocal("Revert Menu"));
     endstone::Slider radius;
     endstone::Slider Time;
     endstone::Dropdown keyType;
     endstone::TextInput keyWords;
 
-    radius.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+Tran.getLocal("Radius"));radius.setDefaultValue(15);radius.setMin(1);radius.setMax(50);radius.setStep(1);
-    Time.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+Tran.getLocal("Lookback Time (hours)"));Time.setDefaultValue(12);Time.setMin(1);Time.setMax(168);Time.setStep(1);
-    keyType.setLabel(Tran.getLocal("Search By"));
-    keyType.setOptions({Tran.getLocal("Source ID"),Tran.getLocal("Source Name"),Tran.getLocal("Target ID"),Tran.getLocal("Target Name"),Tran.getLocal("Action")});
-    keyWords.setLabel(Tran.getLocal("Keywords"));
-    keyWords.setPlaceholder(Tran.getLocal("Please enter keywords"));
+    radius.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+tran_->getLocal("Radius"));radius.setDefaultValue(15);radius.setMin(1);radius.setMax(50);radius.setStep(1);
+    Time.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+tran_->getLocal("Lookback Time (hours)"));Time.setDefaultValue(12);Time.setMin(1);Time.setMax(168);Time.setStep(1);
+    keyType.setLabel(tran_->getLocal("Search By"));
+    keyType.setOptions({tran_->getLocal("Source ID"),tran_->getLocal("Source Name"),tran_->getLocal("Target ID"),tran_->getLocal("Target Name"),tran_->getLocal("Action")});
+    keyWords.setLabel(tran_->getLocal("Keywords"));
+    keyWords.setPlaceholder(tran_->getLocal("Please enter keywords"));
     tyMenu.setControls({radius,Time,keyType,keyWords});
     tyMenu.setOnSubmit([=](const endstone::Player *p,const string& response) {
         json response_json = json::parse(response);
@@ -177,18 +185,19 @@ void Menu::tybackMenu(const endstone::Player &sender) {
 }
 
 //tys 菜单
-void Menu::tysMenu(const endstone::Player &sender) {
+void Menu::tysMenu(const endstone::Player &sender) const
+{
     endstone::ModalForm tyMenu;
-    tyMenu.setTitle(Tran.getLocal("Log Browser"));
+    tyMenu.setTitle(tran_->getLocal("Log Browser"));
     endstone::Slider Time;
     endstone::Dropdown keyType;
     endstone::TextInput keyWords;
 
-    Time.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+Tran.getLocal("Lookback Time (hours)"));Time.setDefaultValue(12);Time.setMin(1);Time.setMax(168);Time.setStep(1);
-    keyType.setLabel(Tran.getLocal("Search By"));
-    keyType.setOptions({Tran.getLocal("Source ID"),Tran.getLocal("Source Name"),Tran.getLocal("Target ID"),Tran.getLocal("Target Name"),Tran.getLocal("Action")});
-    keyWords.setLabel(Tran.getLocal("Keywords"));
-    keyWords.setPlaceholder(Tran.getLocal("Please enter keywords"));
+    Time.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+tran_->getLocal("Lookback Time (hours)"));Time.setDefaultValue(12);Time.setMin(1);Time.setMax(168);Time.setStep(1);
+    keyType.setLabel(tran_->getLocal("Search By"));
+    keyType.setOptions({tran_->getLocal("Source ID"),tran_->getLocal("Source Name"),tran_->getLocal("Target ID"),tran_->getLocal("Target Name"),tran_->getLocal("Action")});
+    keyWords.setLabel(tran_->getLocal("Keywords"));
+    keyWords.setPlaceholder(tran_->getLocal("Please enter keywords"));
     tyMenu.setControls({Time,keyType,keyWords});
     tyMenu.setOnSubmit([=](const endstone::Player *p,const string& response) {
         json response_json = json::parse(response);
@@ -211,20 +220,21 @@ void Menu::tysMenu(const endstone::Player &sender) {
 }
 
 //ty菜单
-void Menu::tyMenu(const endstone::Player &sender) {
+void Menu::tyMenu(const endstone::Player &sender) const
+{
     endstone::ModalForm tyMenu;
-    tyMenu.setTitle(Tran.getLocal("Log Browser"));
+    tyMenu.setTitle(tran_->getLocal("Log Browser"));
     endstone::Slider radius;
     endstone::Slider Time;
     endstone::Dropdown keyType;
     endstone::TextInput keyWords;
 
-    radius.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+Tran.getLocal("Radius"));radius.setDefaultValue(15);radius.setMin(1);radius.setMax(50);radius.setStep(1);
-    Time.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+Tran.getLocal("Lookback Time (hours)"));Time.setDefaultValue(12);Time.setMin(1);Time.setMax(168);Time.setStep(1);
-    keyType.setLabel(Tran.getLocal("Search By"));
-    keyType.setOptions({Tran.getLocal("Source ID"),Tran.getLocal("Source Name"),Tran.getLocal("Target ID"),Tran.getLocal("Target Name"),Tran.getLocal("Action")});
-    keyWords.setLabel(Tran.getLocal("Keywords"));
-    keyWords.setPlaceholder(Tran.getLocal("Please enter keywords"));
+    radius.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+tran_->getLocal("Radius"));radius.setDefaultValue(15);radius.setMin(1);radius.setMax(50);radius.setStep(1);
+    Time.setLabel(endstone::ColorFormat::Red+"*"+endstone::ColorFormat::Reset+tran_->getLocal("Lookback Time (hours)"));Time.setDefaultValue(12);Time.setMin(1);Time.setMax(168);Time.setStep(1);
+    keyType.setLabel(tran_->getLocal("Search By"));
+    keyType.setOptions({tran_->getLocal("Source ID"),tran_->getLocal("Source Name"),tran_->getLocal("Target ID"),tran_->getLocal("Target Name"),tran_->getLocal("Action")});
+    keyWords.setLabel(tran_->getLocal("Keywords"));
+    keyWords.setPlaceholder(tran_->getLocal("Please enter keywords"));
     tyMenu.setControls({radius,Time,keyType,keyWords});
     tyMenu.setOnSubmit([=](const endstone::Player *p,const string& response) {
         json response_json = json::parse(response);
@@ -248,7 +258,8 @@ void Menu::tyMenu(const endstone::Player &sender) {
 }
 
 //查看在线玩家物品栏函数
-void Menu::showOnlinePlayerBag(const endstone::CommandSender &sender, const endstone::Player& player) {
+void Menu::showOnlinePlayerBag(const endstone::CommandSender &sender, const endstone::Player& player) const
+{
     try {
         std::vector<std::map<std::string, std::string>> all_item;
         
@@ -385,19 +396,19 @@ void Menu::showOnlinePlayerBag(const endstone::CommandSender &sender, const ends
         for (const auto& item_info : all_item) {
             std::string message = fmt::format("{}{}: {} \n {}: {} \n",
                 endstone::ColorFormat::Yellow,
-                Tran.getLocal("Item ID"), item_info.at("item"),
-                Tran.getLocal("Amount"), item_info.at("amount"));
+                tran_->getLocal("Item ID"), item_info.at("item"),
+                tran_->getLocal("Amount"), item_info.at("amount"));
             if (item_info.contains("name")) {
-                message += fmt::format("{}: {}\n",Tran.getLocal("Custom name"),item_info.at("name"));
+                message += fmt::format("{}: {}\n",tran_->getLocal("Custom name"),item_info.at("name"));
             }
             if (item_info.contains("enhance")) {
-                message += fmt::format("{}: {}\n",Tran.getLocal("Enhance"),item_info.at("enhance"));
+                message += fmt::format("{}: {}\n",tran_->getLocal("Enhance"),item_info.at("enhance"));
             }
             output_item += message + std::string(20, '-') + "\n";
         }
 
         if (output_item.empty()) {
-            sender.sendMessage(fmt::format("{}{}", endstone::ColorFormat::Red, Tran.getLocal("This player's inventory is empty")));
+            sender.sendMessage(fmt::format("{}{}", endstone::ColorFormat::Red, tran_->getLocal("This player's inventory is empty")));
         } else {
             endstone::ActionForm form;
             form.setTitle(player.getName());
@@ -405,7 +416,7 @@ void Menu::showOnlinePlayerBag(const endstone::CommandSender &sender, const ends
             sender.asPlayer()->sendForm(form);
         }
     } catch (...) {
-        sender.sendMessage(fmt::format("{}{}", endstone::ColorFormat::Red, Tran.getLocal("Unknow Error")));
+        sender.sendMessage(fmt::format("{}{}", endstone::ColorFormat::Red, tran_->getLocal("Unknow Error")));
     }
 }
 
@@ -424,16 +435,16 @@ void Menu::findHighDensityRegion(endstone::Player &player, const int size) const
             "{}: {},\n"
             "{}: {}",
             endstone::ColorFormat::Yellow,
-            Tran.getLocal("Highest density region in dimension"), result.dim.value(),
-            Tran.getLocal("Midpoint coordinates"), result.mid_x.value(), result.mid_y.value(), result.mid_z.value(),
-            Tran.getLocal("Entity count"), result.count.value(),
-            Tran.getLocal("Most common entity"), result.entity_type.value(),
-            Tran.getLocal("Random entity position"), result.entity_pos.value()
+            tran_->getLocal("Highest density region in dimension"), result.dim.value(),
+            tran_->getLocal("Midpoint coordinates"), result.mid_x.value(), result.mid_y.value(), result.mid_z.value(),
+            tran_->getLocal("Entity count"), result.count.value(),
+            tran_->getLocal("Most common entity"), result.entity_type.value(),
+            tran_->getLocal("Random entity position"), result.entity_pos.value()
         );
         
         // 创建表单
         endstone::ActionForm form;
-        form.setTitle(Tran.getLocal("Entity Density Detection Result"));
+        form.setTitle(tran_->getLocal("Entity Density Detection Result"));
         form.setContent(content);
         
         // 添加按钮
@@ -441,7 +452,7 @@ void Menu::findHighDensityRegion(endstone::Player &player, const int size) const
         
         // 传送按钮
         endstone::Button tpButton;
-        tpButton.setText(Tran.getLocal("Teleport to this area"));
+        tpButton.setText(tran_->getLocal("Teleport to this area"));
         tpButton.setOnClick([this, result](const endstone::Player* p) {
             const std::string dim = result.dim.value();
             // 转换维度名称
@@ -454,8 +465,8 @@ void Menu::findHighDensityRegion(endstone::Player &player, const int size) const
         
         // 打印信息按钮
         endstone::Button printButton;
-        printButton.setText(Tran.getLocal("Print information to chat"));
-        printButton.setOnClick([result](const endstone::Player* p) {
+        printButton.setText(tran_->getLocal("Print information to chat"));
+        printButton.setOnClick([this, result](const endstone::Player* p) {
             std::string message = fmt::format(
                 "{}{} {},\n"
                 "{}:({:.1f}, {:.1f}, {:.1f}),\n"
@@ -463,11 +474,11 @@ void Menu::findHighDensityRegion(endstone::Player &player, const int size) const
                 "{}: {},\n"
                 "{}: {}",
                 endstone::ColorFormat::Yellow,
-                Tran.getLocal("Highest density region in dimension"), result.dim.value(),
-                Tran.getLocal("Midpoint coordinates"), result.mid_x.value(), result.mid_y.value(), result.mid_z.value(),
-                Tran.getLocal("Entity count"), result.count.value(),
-                Tran.getLocal("Most common entity"), result.entity_type.value(),
-                Tran.getLocal("Random entity position"), result.entity_pos.value()
+                tran_->getLocal("Highest density region in dimension"), result.dim.value(),
+                tran_->getLocal("Midpoint coordinates"), result.mid_x.value(), result.mid_y.value(), result.mid_z.value(),
+                tran_->getLocal("Entity count"), result.count.value(),
+                tran_->getLocal("Most common entity"), result.entity_type.value(),
+                tran_->getLocal("Random entity position"), result.entity_pos.value()
             );
             p->sendMessage(message);
         });
@@ -476,6 +487,6 @@ void Menu::findHighDensityRegion(endstone::Player &player, const int size) const
         form.setControls(controls);
         player.sendForm(form);
     } else {
-        player.sendMessage(endstone::ColorFormat::Yellow + Tran.getLocal("No entities detected currently"));
+        player.sendMessage(endstone::ColorFormat::Yellow + tran_->getLocal("No entities detected currently"));
     }
 }

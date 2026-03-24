@@ -19,10 +19,12 @@
 #include <mutex>
 #include <queue>
 
-//数据库清理输出语句缓存
-inline std::vector<std::string> clean_data_message;
-inline int clean_data_status;//0:未开始 1:成功 -1:失败 2:进行中
 namespace yuhangle {
+
+    //数据库清理输出语句缓存
+    inline std::vector<std::string> clean_data_message;
+    inline int clean_data_status;//0:未开始 1:成功 -1:失败 2:进行中
+
     class DatabaseConnection {
     public:
         explicit DatabaseConnection(std::string  db_filename) : db_filename(std::move(db_filename)), db(nullptr) {}
@@ -176,7 +178,7 @@ namespace yuhangle {
         }
 
         // 通用查询 SQL（select查询使用回调函数返回结果为 vector<map<string, string>>）
-        static int queryCallback(void* data, int argc, char** argv, char** azColName) {
+        static int queryCallback(void* data, const int argc, char** argv, char** azColName) {
             auto* result = static_cast<std::vector<std::map<std::string, std::string>>*>(data);
             std::map<std::string, std::string> row;
             for (int i = 0; i < argc; i++) {

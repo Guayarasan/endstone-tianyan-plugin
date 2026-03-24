@@ -4,6 +4,13 @@
 // ReSharper disable CppMemberFunctionMayBeConst
 #include "event_listener.h"
 #include "tianyan_protect.h"
+#include <tianyan_plugin.h>
+#include <translate.hpp>
+
+EventListener::EventListener(TianyanPlugin* tianyan, translate* tran)
+    :plugin_(*tianyan), tran_(tran)
+{}
+
 
 void EventListener::initOnlinePlayers()
 {
@@ -18,8 +25,8 @@ bool EventListener::canTriggerEvent(const string& playername) {
     const auto now = std::chrono::steady_clock::now();
 
     // 查找玩家的上次触发时间
-    if (lastTriggerTime.contains(playername)) {
-        const auto lastTime = lastTriggerTime[playername];
+    if (TianyanCore::lastTriggerTime.contains(playername)) {
+        const auto lastTime = TianyanCore::lastTriggerTime[playername];
 
         // 如果时间差小于 0.1 秒，不允许触发
         if (const auto elapsedTime = std::chrono::duration<double>(now - lastTime).count(); elapsedTime < 0.1) {
@@ -28,7 +35,7 @@ bool EventListener::canTriggerEvent(const string& playername) {
     }
 
     // 更新玩家的上次触发时间为当前时间
-    lastTriggerTime[playername] = now;
+    TianyanCore::lastTriggerTime[playername] = now;
     return true;
 }
 
@@ -82,7 +89,7 @@ void EventListener::onBlockPlace(const endstone::BlockPlaceEvent& event){
 
 void EventListener::onActorDamage(const endstone::ActorDamageEvent& event){
     //无名的烂大街生物无需在意
-    if (event.getActor().getNameTag().empty() && ranges::find(no_log_mobs, event.getActor().getType()) != no_log_mobs.end()) {
+    if (event.getActor().getNameTag().empty() && ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
         return;
     }
     TianyanCore::LogData logData;
@@ -176,7 +183,7 @@ void EventListener::onPlayerRightClickBlock(const endstone::PlayerInteractEvent&
 
 void EventListener::onPlayerRightClickActor(const endstone::PlayerInteractActorEvent& event){
     //无名的烂大街生物无需在意
-    if (event.getActor().getNameTag().empty() && ranges::find(no_log_mobs, event.getActor().getType()) != no_log_mobs.end()) {
+    if (event.getActor().getNameTag().empty() && ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
         return;
     }
     TianyanCore::LogData logData;
@@ -331,7 +338,7 @@ void EventListener::onPistonRetract(const endstone::BlockPistonRetractEvent&even
 
 void EventListener::onActorDie(const endstone::ActorDeathEvent&event) {
     //无名的烂大街生物无需在意
-    if (event.getActor().getNameTag().empty() && ranges::find(no_log_mobs, event.getActor().getType()) != no_log_mobs.end()) {
+    if (event.getActor().getNameTag().empty() && ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
         return;
     }
     TianyanCore::LogData logData;
@@ -424,8 +431,8 @@ void EventListener::onPlayerJoin(const endstone::PlayerJoinEvent &event) {
     if (!event.getPlayer().asPlayer()) return;
     online_players_.insert(&event.getPlayer());
     std::ostringstream out;
-    out << endstone::ColorFormat::Yellow << Tran.getLocal("Player") << " " << event.getPlayer().getName() << " " << Tran.getLocal("joined server!")
-    << " " <<Tran.getLocal("Device OS: ")<< event.getPlayer().getDeviceOS() << " " << Tran.getLocal("Device ID: ") << event.getPlayer().getDeviceId();
+    out << endstone::ColorFormat::Yellow << tran_->getLocal("Player") << " " << event.getPlayer().getName() << " " << tran_->getLocal("joined server!")
+    << " " <<tran_->getLocal("Device OS: ")<< event.getPlayer().getDeviceOS() << " " << tran_->getLocal("Device ID: ") << event.getPlayer().getDeviceId();
     plugin_.getServer().getLogger().info(out.str());
 }
 
@@ -440,10 +447,10 @@ void EventListener::onPlayerLeave(const endstone::PlayerQuitEvent& event)
 void EventListener::onPlayerSendMSG(const endstone::PlayerChatEvent &event) {
     TianyanCore::recordPlayerSendMSG(event.getPlayer().getName());
     if (TianyanCore::checkPlayerSendMSG(event.getPlayer().getName())) {
-        string reason = Tran.getLocal("Too many messages sent in a short time");
+        string reason = tran_->getLocal("Too many messages sent in a short time");
         plugin_.getServer().getBanList().addBan(event.getPlayer().getName(),reason, std::chrono::hours(24), "Tianyan Plugin");
         event.getPlayer().kick(reason);
-        plugin_.getServer().broadcastMessage(endstone::ColorFormat::Yellow + Tran.getLocal("Player") + ": " + event.getPlayer().getName() + " " + Tran.getLocal("has been banned for sending too many messages in a short time"));
+        plugin_.getServer().broadcastMessage(endstone::ColorFormat::Yellow + tran_->getLocal("Player") + ": " + event.getPlayer().getName() + " " + tran_->getLocal("has been banned for sending too many messages in a short time"));
     }
 }
 
@@ -451,10 +458,10 @@ void EventListener::onPlayerSendMSG(const endstone::PlayerChatEvent &event) {
 void EventListener::onPlayerSendCMD(const endstone::PlayerChatEvent &event) {
     TianyanCore::recordPlayerSendCMD(event.getPlayer().getName());
     if (TianyanCore::checkPlayerSendCMD(event.getPlayer().getName())) {
-        string reason = Tran.getLocal("Too many commands sent in a short time");
+        string reason = tran_->getLocal("Too many commands sent in a short time");
         plugin_.getServer().getBanList().addBan(event.getPlayer().getName(),reason, std::chrono::hours(24), "Tianyan Plugin");
         event.getPlayer().kick(reason);
-        plugin_.getServer().broadcastMessage(endstone::ColorFormat::Yellow + Tran.getLocal("Player") + ": " + event.getPlayer().getName() + " " + Tran.getLocal("has been banned for sending too many commands in a short time"));
+        plugin_.getServer().broadcastMessage(endstone::ColorFormat::Yellow + tran_->getLocal("Player") + ": " + event.getPlayer().getName() + " " + tran_->getLocal("has been banned for sending too many commands in a short time"));
     }
 }
 
@@ -467,20 +474,20 @@ void EventListener::onPlayerTryJoin(const endstone::PlayerLoginEvent &event) {
         const auto reason = banData.value().reason.value_or("");
         if (banData->player_name == "Null") {
             if (TianyanProtect::updatePlayerNameForDeviceId(banData.value().device_id,player_name)) {
-                plugin_.getLogger().info(endstone::ColorFormat::Yellow+Tran.getLocal("Player")+": "+player_name + " " + Tran.getLocal("has been banned for using a banned device")+": " + banData.value().device_id);
+                plugin_.getLogger().info(endstone::ColorFormat::Yellow+tran_->getLocal("Player")+": "+player_name + " " + tran_->getLocal("has been banned for using a banned device")+": " + banData.value().device_id);
             } else {
-                plugin_.getLogger().error(Tran.getLocal("Unknow Error"));
+                plugin_.getLogger().error(tran_->getLocal("Unknow Error"));
             }
-            event.getPlayer().kick(Tran.getLocal("Your device has been baned")+": "+reason);
+            event.getPlayer().kick(tran_->getLocal("Your device has been baned")+": "+reason);
         } else {
-            event.getPlayer().kick(Tran.getLocal("Your device has been baned")+": "+reason);
-            plugin_.getLogger().info(endstone::ColorFormat::Yellow+Tran.getLocal("Baned player: ")+player_name+" ("+device_id+") "+Tran.getLocal("try to join server"));
+            event.getPlayer().kick(tran_->getLocal("Your device has been baned")+": "+reason);
+            plugin_.getLogger().info(endstone::ColorFormat::Yellow+tran_->getLocal("Baned player: ")+player_name+" ("+device_id+") "+tran_->getLocal("try to join server"));
         }
     }
     //通过设备ID检查，检查是否使用过封禁设备
     else {
         if (TianyanProtect::isPlayerBanned(player_name)) {
-            plugin_.getLogger().info(endstone::ColorFormat::Yellow+Tran.getLocal("Baned player: ")+player_name+" ("+device_id+") "+Tran.getLocal("try to join server"));
+            plugin_.getLogger().info(endstone::ColorFormat::Yellow+tran_->getLocal("Baned player: ")+player_name+" ("+device_id+") "+tran_->getLocal("try to join server"));
             string reason;
             for (const auto &baned_player : BanIDPlayers) {
                 if (baned_player.player_name == player_name) {
@@ -493,7 +500,7 @@ void EventListener::onPlayerTryJoin(const endstone::PlayerLoginEvent &event) {
             } else {
                 (void)plugin_.getServer().dispatchCommand(plugin_.getServer().getCommandSender(),"ban-id " + device_id+ " \"" + reason +"\"");
             }
-            event.getPlayer().kick(Tran.getLocal("Your device has been baned")+": "+reason);
+            event.getPlayer().kick(tran_->getLocal("Your device has been baned")+": "+reason);
         }
     }
 }

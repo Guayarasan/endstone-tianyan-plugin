@@ -7,9 +7,12 @@
 #include <endstone/endstone.hpp>
 #include "global.h"
 
+class TianyanPlugin;
+class translate;
+
 class TianyanProtect {
 public:
-    explicit TianyanProtect(endstone::Plugin &plugin) : plugin_(plugin){}
+    explicit TianyanProtect(TianyanPlugin* tianyan, translate* tran);
 
     // 设备ID黑名单初始化
     void deviceIDBlacklistInit() const;
@@ -34,6 +37,7 @@ public:
 
 private:
     endstone::Plugin &plugin_;
+    translate* tran_;
 };
 
 

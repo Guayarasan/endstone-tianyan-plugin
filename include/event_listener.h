@@ -8,10 +8,15 @@
 #include "global.h"
 #include <endstone/endstone.hpp>
 
+#include "translate.hpp"
+
+class TianyanPlugin;
+class translate;
+
 
 class EventListener {
 public:
-    explicit EventListener(endstone::Plugin& plugin) : plugin_(plugin) {}
+    explicit EventListener(TianyanPlugin* tianyan, translate* tran);
 
     void initOnlinePlayers();
 
@@ -59,6 +64,7 @@ public:
 
 private:
     endstone::Plugin &plugin_;
+    translate* tran_;
     std::unordered_set<const endstone::Player*> online_players_;
 };
 

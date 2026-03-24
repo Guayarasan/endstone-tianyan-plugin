@@ -6,7 +6,6 @@
 #define TIANYAN_GLOBAL_H
 #include "database.hpp"
 #include "tianyan_core.h"
-#include "translate.hpp"
 #include <nlohmann/json.hpp>
 #include <condition_variable>
 using namespace nlohmann;
@@ -14,11 +13,6 @@ using namespace nlohmann;
 inline vector<TianyanCore::LogData> logDataCache;
 //封禁设备ID玩家缓存
 inline vector<TianyanCore::BanIDPlayer> BanIDPlayers;
-//语言
-inline translate Tran;
-//初始化其它实例
-inline yuhangle::Database Database(dbPath);
-inline TianyanCore tyCore(Database);
 //缓存锁
 inline std::mutex cacheMutex;
 

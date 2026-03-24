@@ -2,21 +2,28 @@
 // Created by yuhang on 2025/12/2.
 //
 #include "tianyan_protect.h"
+#include <tianyan_plugin.h>
+#include <translate.hpp>
+
+TianyanProtect::TianyanProtect(TianyanPlugin* tianyan, translate* tran)
+    :plugin_(*tianyan), tran_(tran)
+{}
+
 
 // 设备ID黑名单初始化
 void TianyanProtect::deviceIDBlacklistInit() const {
     
     // 检查文件是否存在
-    std::ifstream file(ban_id_path);
+    std::ifstream file(TianyanCore::ban_id_path);
     if (!file.is_open()) {
         // 文件不存在，创建新文件
-        if (std::ofstream outfile(ban_id_path); outfile.is_open()) {
+        if (std::ofstream outfile(TianyanCore::ban_id_path); outfile.is_open()) {
             json empty_json = json::object();
             outfile << empty_json.dump(4);
             outfile.close();
-            plugin_.getLogger().info(Tran.getLocal("Automatically create a device ID blacklist file"));
+            plugin_.getLogger().info(tran_->getLocal("Automatically create a device ID blacklist file"));
         } else {
-            plugin_.getLogger().error(Tran.getLocal("Failed to create the device ID blacklist file"));
+            plugin_.getLogger().error(tran_->getLocal("Failed to create the device ID blacklist file"));
         }
         return;
     }
@@ -53,12 +60,12 @@ void TianyanProtect::deviceIDBlacklistInit() const {
                 
                 BanIDPlayers.push_back(ban_player);
             } else {
-                plugin_.getLogger().error(Tran.tr(Tran.getLocal("The data for device ID {} is missing the 'player_name' field")+","+device_id));
+                plugin_.getLogger().error(tran_->tr(tran_->getLocal("The data for device ID {} is missing the 'player_name' field")+","+device_id));
             }
         }
         
     } catch (const std::exception& e) {
-        plugin_.getLogger().error(Tran.tr(Tran.getLocal("Error occurred while parsing the device ID blacklist file: {}")+","+ e.what()));
+        plugin_.getLogger().error(tran_->tr(tran_->getLocal("Error occurred while parsing the device ID blacklist file: {}")+","+ e.what()));
     }
 }
 
@@ -67,14 +74,14 @@ void TianyanProtect::deviceIDBlacklistInit() const {
     // 检查该设备ID是否已经存在于缓存中
     for (const auto& existingPlayer : BanIDPlayers) {
         if (existingPlayer.device_id == banPlayer.device_id) {
-            plugin_.getLogger().error(Tran.tr(Tran.getLocal("The device ID {} already exists"), banPlayer.device_id));
+            plugin_.getLogger().error(tran_->tr(tran_->getLocal("The device ID {} already exists"), banPlayer.device_id));
             return false;
         }
     }
 
     try {
         // 读取现有文件内容
-        std::ifstream file(ban_id_path);
+        std::ifstream file(TianyanCore::ban_id_path);
         json jsonData;
         
         if (file.is_open()) {
@@ -89,7 +96,7 @@ void TianyanProtect::deviceIDBlacklistInit() const {
 
         // 检查该设备ID是否已经存在于文件中
         if (jsonData.contains(banPlayer.device_id)) {
-            plugin_.getLogger().error(Tran.tr(Tran.getLocal("The device ID {} already exists"), banPlayer.device_id));
+            plugin_.getLogger().error(tran_->tr(tran_->getLocal("The device ID {} already exists"), banPlayer.device_id));
             return false;
         }
 
@@ -109,20 +116,20 @@ void TianyanProtect::deviceIDBlacklistInit() const {
         jsonData[banPlayer.device_id] = newEntry;
 
         // 写入文件
-        if (std::ofstream outfile(ban_id_path); outfile.is_open()) {
+        if (std::ofstream outfile(TianyanCore::ban_id_path); outfile.is_open()) {
             outfile << jsonData.dump(4);
             outfile.close();
             
             // 添加到缓存
             BanIDPlayers.push_back(banPlayer);
             
-            plugin_.getLogger().info(Tran.tr(Tran.getLocal("Device ID {} banned successfully"),banPlayer.device_id));
+            plugin_.getLogger().info(tran_->tr(tran_->getLocal("Device ID {} banned successfully"),banPlayer.device_id));
             return true;
         }
-        plugin_.getLogger().error(Tran.getLocal("Failed to write to the device ID blacklist file"));
+        plugin_.getLogger().error(tran_->getLocal("Failed to write to the device ID blacklist file"));
         return false;
     } catch (const std::exception& e) {
-        plugin_.getLogger().error(Tran.tr(Tran.getLocal("Error occurred while banning device ID {}: {}"), banPlayer.device_id, e.what()));
+        plugin_.getLogger().error(tran_->tr(tran_->getLocal("Error occurred while banning device ID {}: {}"), banPlayer.device_id, e.what()));
         return false;
     }
 }
@@ -142,12 +149,12 @@ void TianyanProtect::deviceIDBlacklistInit() const {
     }
     
     if (!foundInCache) {
-        plugin_.getLogger().error(Tran.tr(Tran.getLocal("Device ID {} not found in cache"), deviceId));
+        plugin_.getLogger().error(tran_->tr(tran_->getLocal("Device ID {} not found in cache"), deviceId));
     }
 
     try {
         // 读取现有文件内容
-        std::ifstream file(ban_id_path);
+        std::ifstream file(TianyanCore::ban_id_path);
         json jsonData;
         
         if (file.is_open()) {
@@ -159,13 +166,13 @@ void TianyanProtect::deviceIDBlacklistInit() const {
                 jsonData = json::parse(content);
             }
         } else {
-            plugin_.getLogger().error(Tran.getLocal("Failed to open the device ID blacklist file for reading"));
+            plugin_.getLogger().error(tran_->getLocal("Failed to open the device ID blacklist file for reading"));
             return false;
         }
 
         // 检查该设备ID是否存在于文件中
         if (!jsonData.contains(deviceId)) {
-            plugin_.getLogger().error(Tran.tr(Tran.getLocal("Device ID {} not found in file"), deviceId));
+            plugin_.getLogger().error(tran_->tr(tran_->getLocal("Device ID {} not found in file"), deviceId));
             return foundInCache; // 如果缓存中有就返回true，否则false
         }
 
@@ -173,17 +180,17 @@ void TianyanProtect::deviceIDBlacklistInit() const {
         jsonData.erase(deviceId);
 
         // 写入文件
-        if (std::ofstream outfile(ban_id_path); outfile.is_open()) {
+        if (std::ofstream outfile(TianyanCore::ban_id_path); outfile.is_open()) {
             outfile << jsonData.dump(4);
             outfile.close();
             
-            plugin_.getLogger().info(Tran.tr(Tran.getLocal("Device ID {} unbanned successfully"), deviceId));
+            plugin_.getLogger().info(tran_->tr(tran_->getLocal("Device ID {} unbanned successfully"), deviceId));
             return true;
         }
-        plugin_.getLogger().error(Tran.getLocal("Failed to write to the device ID blacklist file"));
+        plugin_.getLogger().error(tran_->getLocal("Failed to write to the device ID blacklist file"));
         return false;
     } catch (const std::exception& e) {
-        plugin_.getLogger().error(Tran.tr(Tran.getLocal("Error occurred while unbanning device ID {}: {}"),deviceId, e.what()));
+        plugin_.getLogger().error(tran_->tr(tran_->getLocal("Error occurred while unbanning device ID {}: {}"),deviceId, e.what()));
         return false;
     }
 }
@@ -225,7 +232,7 @@ bool TianyanProtect::updatePlayerNameForDeviceId(const std::string& deviceId, co
         }
 
         // 读取现有文件内容
-        std::ifstream file(ban_id_path);
+        std::ifstream file(TianyanCore::ban_id_path);
         json jsonData;
         
         if (file.is_open()) {
@@ -249,7 +256,7 @@ bool TianyanProtect::updatePlayerNameForDeviceId(const std::string& deviceId, co
         jsonData[deviceId]["player_name"] = newPlayerName;
 
         // 写入文件
-        if (std::ofstream outfile(ban_id_path); outfile.is_open()) {
+        if (std::ofstream outfile(TianyanCore::ban_id_path); outfile.is_open()) {
             outfile << jsonData.dump(4);
             outfile.close();
             return true;
