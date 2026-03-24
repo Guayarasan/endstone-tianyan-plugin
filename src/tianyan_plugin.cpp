@@ -448,6 +448,12 @@ _____   _
         windows_print_webui_log = getServer().getScheduler().runTaskTimer(*this, [&]() {dump_webui_log_once();},0,20);
 #endif
     }
+    //注册api
+    const auto api_ptr = std::shared_ptr<ITianyanAPI>(this, [](ITianyanAPI*){
+    });
+    // 2. 注册到服务管理器
+    getServer().getServiceManager().registerService("TianyanAPI", api_ptr, *this, endstone::ServicePriority::Normal);
+    getLogger().info("天眼 API 服务已注册到 ServiceManager");
 }
 
 void TianyanPlugin::onDisable()
@@ -1091,4 +1097,49 @@ std::string StaticTranslate::get(const std::string& key) {
     } catch (...) {
     }
     return key;
+}
+
+//api接口
+
+// 转换函数
+std::vector<tianyan::LogData> TianyanPlugin::processLogConversion(const std::vector<TianyanCore::LogData>& source, const int limit) {
+    std::vector<tianyan::LogData> result;
+    if (source.empty()) return result;
+
+    // 确定转换条数
+    const size_t count = (limit > 0 && source.size() > static_cast<size_t>(limit)) ? static_cast<size_t>(limit) : source.size();
+    result.reserve(count);
+
+    for (size_t i = 0; i < count; ++i) {
+        const auto& [uuid, id, name, pos_x, pos_y, pos_z, world, obj_id, obj_name, time, type, data, status] = source[i];
+        result.push_back({
+            uuid, id, name,
+            pos_x, pos_y, pos_z,
+            world, obj_id, obj_name,
+            time, type, data, status
+        });
+    }
+    return result;
+}
+
+// --- 同步版本实现 ---
+std::vector<tianyan::LogData> TianyanPlugin::getLogDataSync(double hours, const int limit) const
+{
+    if (!isCompatible()) return {};
+    const auto searchData = tyCore->searchLog({"", hours});
+    return processLogConversion(searchData, limit);
+}
+
+// --- 异步版本实现 ---
+std::future<std::vector<tianyan::LogData>> TianyanPlugin::getLogDataAsync(double hours) {
+    if (!isCompatible()) return {};
+    return std::async(std::launch::async, [this, hours]() {
+        const auto searchData = tyCore->searchLog({"", hours});
+        return processLogConversion(searchData, -1);
+    });
+}
+
+std::vector<tianyan::LogData> TianyanPlugin::getLogDataSyncImpl(double seconds, const int limit) {
+    const auto searchData = tyCore->searchLog({"", seconds});
+    return processLogConversion(searchData, limit);
 }

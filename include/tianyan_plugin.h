@@ -11,6 +11,7 @@
 #include "event_listener.h"
 #include "menu.h"
 #include "translate.hpp"
+#include <tianyan/api.h>
 
 class StaticTranslate
 {
@@ -18,7 +19,10 @@ public:
     static std::string get(const std::string& key);
 };
 
-class TianyanPlugin : public endstone::Plugin {
+class TianyanPlugin : public endstone::Plugin, public tianyan::ITianyanAPI{
+protected:
+    // 实现受保护的底层查询
+    std::vector<tianyan::LogData> getLogDataSyncImpl(double seconds, int limit) override;
 public:
     //语言
     static inline std::unique_ptr<translate> Tran;
@@ -50,6 +54,15 @@ public:
 
     // 批量更新回溯状态
     void updateRevertStatus() const;
+
+    //api
+    int getApiVersion() const override {
+        return tianyan::TIANYAN_API_VERSION;
+    }
+
+    std::future<std::vector<tianyan::LogData>> getLogDataAsync(double hours) override;
+    static std::vector<tianyan::LogData> processLogConversion(const std::vector<TianyanCore::LogData>& source, int limit);
+    [[nodiscard]] std::vector<tianyan::LogData> getLogDataSync(double hours, int limit) const;
 
 private:
     //初始化其它实例
