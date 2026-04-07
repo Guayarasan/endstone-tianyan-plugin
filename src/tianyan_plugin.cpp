@@ -423,7 +423,7 @@ void TianyanPlugin::onEnable()
     registerEvent<endstone::ActorDeathEvent>(EventListener::onActorDie, endstone::EventPriority::Monitor);
     registerEvent<endstone::PlayerDeathEvent>(EventListener::onPlayerDie, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerPickup, *eventListener_, endstone::EventPriority::Monitor);
-    registerEvent(&EventListener::onPlayerDropItem, *eventListener_, endstone::EventPriority::Monitor);
+    //registerEvent(&EventListener::onPlayerDropItem, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerJoin, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerLeave, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerSendMSG, *eventListener_, endstone::EventPriority::Monitor);
