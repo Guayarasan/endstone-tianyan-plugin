@@ -89,7 +89,7 @@ void EventListener::onBlockPlace(const endstone::BlockPlaceEvent& event){
 
 void EventListener::onActorDamage(const endstone::ActorDamageEvent& event){
     //无名的烂大街生物无需在意
-    if (event.getActor().getNameTag().empty() && ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
+    if (event.getActor().getNameTag().empty() && std::ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
         return;
     }
     TianyanCore::LogData logData;
@@ -141,7 +141,7 @@ void EventListener::onPlayerRightClickBlock(const endstone::PlayerInteractEvent&
             return item_id.find(kw) != std::string::npos;
         };
 
-        if (ranges::any_of(dangerKeywords, containsKeyword)) {
+        if (std::ranges::any_of(dangerKeywords, containsKeyword)) {
             danger_item = true;
         }
     }
@@ -183,7 +183,7 @@ void EventListener::onPlayerRightClickBlock(const endstone::PlayerInteractEvent&
 
 void EventListener::onPlayerRightClickActor(const endstone::PlayerInteractActorEvent& event){
     //无名的烂大街生物无需在意
-    if (event.getActor().getNameTag().empty() && ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
+    if (event.getActor().getNameTag().empty() && std::ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
         return;
     }
     TianyanCore::LogData logData;
@@ -338,7 +338,7 @@ void EventListener::onPistonRetract(const endstone::BlockPistonRetractEvent&even
 
 void EventListener::onActorDie(const endstone::ActorDeathEvent&event) {
     //无名的烂大街生物无需在意
-    if (event.getActor().getNameTag().empty() && ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
+    if (event.getActor().getNameTag().empty() && std::ranges::find(TianyanCore::no_log_mobs, event.getActor().getType()) != TianyanCore::no_log_mobs.end()) {
         return;
     }
     TianyanCore::LogData logData;
