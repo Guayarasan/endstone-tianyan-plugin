@@ -400,31 +400,31 @@ void EventListener::onPlayerPickup(const endstone::PlayerPickupItemEvent&event) 
     }
 }
 
-void EventListener::onPlayerDropItem(const endstone::PlayerDropItemEvent& event) {
-    TianyanCore::LogData logData;
+//void EventListener::onPlayerDropItem(const endstone::PlayerDropItemEvent& event) {
+    //TianyanCore::LogData logData;
 
-    const endstone::Player& player = event.getPlayer();
-    if (!online_players_.contains(&player)) {
-        return;
-    }
-    logData.uuid = yuhangle::Database::generate_uuid_v4();
-    logData.id = player.getType();
-    logData.name = player.getName();
-    logData.pos_x = player.getLocation().getX();
-    logData.pos_y = player.getLocation().getY();
-    logData.pos_z = player.getLocation().getZ();
-    logData.world = player.getLocation().getDimension().getName();
-    logData.obj_id = event.getItem().getType().getId();
-    logData.time = std::time(nullptr);
-    logData.type = "player_drop_item";
-    if (event.isCancelled()) {
-        logData.status = "canceled";
-    }
-    {
-        std::lock_guard lock(cacheMutex);
-        logDataCache.push_back(logData);
-    }
-}
+    //const endstone::Player& player = event.getPlayer();
+    //if (!online_players_.contains(&player)) {
+        //return;
+    //}
+    //logData.uuid = yuhangle::Database::generate_uuid_v4();
+    //logData.id = player.getType();
+    //logData.name = player.getName();
+    //logData.pos_x = player.getLocation().getX();
+    //logData.pos_y = player.getLocation().getY();
+    //logData.pos_z = player.getLocation().getZ();
+    //logData.world = player.getLocation().getDimension().getName();
+    //logData.obj_id = event.getItem().getType().getId();
+    //logData.time = std::time(nullptr);
+    //logData.type = "player_drop_item";
+    //if (event.isCancelled()) {
+        //logData.status = "canceled";
+    //}
+    //{
+        //std::lock_guard lock(cacheMutex);
+        //logDataCache.push_back(logData);
+    //}
+//}
 
 //玩家加入事件
 void EventListener::onPlayerJoin(const endstone::PlayerJoinEvent &event) {
