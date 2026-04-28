@@ -603,12 +603,13 @@ namespace yuhangle {
             return rc;
         }
 
-        int getAllLog(std::vector<std::map<std::string, std::string>> &result) const {
+        int getAllLog(std::vector<std::map<std::string, std::string>> &result) const
+        {
             // 获取所有数据
-            constexpr std::string sql = "SELECT * FROM LOGDATA;";
+            constexpr std::string_view sql = "SELECT * FROM LOGDATA;";
 
             // 调用 querySQL 函数执行查询，并将结果存储到 result 中
-            return querySQL(sql, result);
+            return querySQL(std::string(sql), result);
         }
 
         int searchLog(std::vector<std::map<std::string, std::string>> &result,

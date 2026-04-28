@@ -14,7 +14,7 @@ class TianyanCore {
 public:
     explicit TianyanCore(yuhangle::Database database);
     //文件目录
-    static constexpr string dataPath = "plugins/tianyan_data";
+    static constexpr std::string_view dataPath = "plugins/tianyan_data";
     static inline const string language_path = "plugins/tianyan_data/language/";
     static inline const string dbPath = "plugins/tianyan_data/ty_data.db";
     static inline const string config_path = "plugins/tianyan_data/config.json";
