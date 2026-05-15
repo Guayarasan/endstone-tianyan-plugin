@@ -134,13 +134,14 @@ jobs:
         run: |
           DATE_TAG=$(date -u +'%Y-%m-%d')
 
-          # 删除已有的 nightly release 和 tag（忽略不存在的情况）
+          # 删除已有的 nightly release 和远程 tag（忽略不存在的情况）
           gh release delete nightly --yes 2>/dev/null || true
           git push --delete origin nightly 2>/dev/null || true
 
-          # 创建新的 nightly release
+          # 创建新的 nightly release，指定目标 commit 防止本地残留 tag 冲突
           gh release create nightly \
             --title "Nightly Build $DATE_TAG" \
             --notes "Auto-built from commit ${{ github.sha }} on $DATE_TAG" \
+            --target ${{ github.sha }} \
             --prerelease \
             artifacts/*
