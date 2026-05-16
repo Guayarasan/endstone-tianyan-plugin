@@ -3,11 +3,10 @@ import json
 import logging
 import math
 import os
-import sqlite3
 import subprocess
 import sys
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("tianyan_plugin")
 
@@ -219,6 +218,112 @@ def load_language(lang_code="en_US"):
         return {}
 
 
+# 简略 TOML 解析器（仅处理 mysql_api 配置格式）
+def _parse_simple_toml(path):
+    """解析 key = "value" 形式的简单 TOML 文件，返回 dict。"""
+    config = {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or line.startswith('['):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    config[key.strip()] = value.strip().strip('"').strip("'")
+    except (FileNotFoundError, IOError) as e:
+        logging.warning(f"Failed to read TOML config {path}: {e}")
+    return config
+
+
+def _load_mysql_config():
+    """从 mysql_api 插件配置读取 MySQL 连接信息。"""
+    mysql_config_path = os.path.join(BASE_DIR, "..", "..", "mysql_api", "config.toml")
+    raw = _parse_simple_toml(mysql_config_path)
+    # 补齐缺失字段
+    return {
+        "host": raw.get("host", "127.0.0.1"),
+        "port": int(raw.get("port", 3306)),
+        "user": raw.get("user", "root"),
+        "password": raw.get("password", ""),
+        "database": raw.get("database", "endstone"),
+    }
+
+
+class Database:
+    """数据库连接封装，根据配置自动选择 SQLite 或 MySQL。"""
+
+    def __init__(self):
+        self.db_type = "sqlite"
+        self.conn = None
+
+        # 读取天眼插件配置，判断数据库类型
+        tianyan_config_path = os.path.join(BASE_DIR, "..", "config.json")
+        db_type = "sqlite"
+        try:
+            with open(tianyan_config_path, 'r', encoding='utf-8') as f:
+                tc = json.load(f)
+                db_type = tc.get("database_type", "sqlite")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logging.warning(f"Failed to read tianyan config: {e}, using SQLite")
+
+        if db_type == "mysql":
+            try:
+                import pymysql
+                mysql_cfg = _load_mysql_config()
+                self.conn = pymysql.connect(
+                    host=mysql_cfg["host"],
+                    port=mysql_cfg["port"],
+                    user=mysql_cfg["user"],
+                    password=mysql_cfg["password"],
+                    database=mysql_cfg["database"],
+                    cursorclass=pymysql.cursors.DictCursor,
+                )
+                self.db_type = "mysql"
+                self.database = mysql_cfg["database"]
+                logging.info("WebUI connected to MySQL")
+            except ImportError:
+                logging.warning("pymysql not installed, falling back to SQLite")
+            except Exception as e:
+                logging.warning(f"MySQL connection failed ({e}), falling back to SQLite")
+
+        if self.db_type == "sqlite":
+            import sqlite3
+            self._sqlite3 = sqlite3
+            self.database = None
+            db_path = os.path.join(BASE_DIR, "..", "ty_data.db")
+            self.conn = self._sqlite3.connect(db_path)
+            self.conn.row_factory = self._sqlite3.Row
+
+    def execute(self, sql: str, params: Optional[list] = None):
+        """执行 SQL，返回 cursor。自动处理参数占位符差异。"""
+        if self.db_type == "mysql":
+            sql = sql.replace("?", "%s")
+        cursor = self.conn.cursor()
+        cursor.execute(sql, params or [])
+        return cursor
+
+    def fetchall(self, cursor) -> list[dict]:
+        """以 dict 列表形式返回所有结果行。"""
+        if self.db_type == "sqlite":
+            return [dict(row) for row in cursor.fetchall()]
+        return cursor.fetchall()
+
+    def fetchone(self, cursor) -> Optional[dict]:
+        """以 dict 形式返回第一行。"""
+        rows = self.fetchall(cursor)
+        return rows[0] if rows else None
+
+    def close(self):
+        self.conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
 # 配置日志系统
 def setup_logging():
     """配置日志，输出到文件和控制台"""
@@ -308,10 +413,13 @@ async def get_language(lang_code: str):
     return load_language(lang_code)
 
 
-# 辅助函数：获取文件大小
-def get_db_size():
-    if os.path.exists(DB_PATH):
-        size_bytes = os.path.getsize(DB_PATH)
+# 辅助函数：获取文件大小或 MySQL 标识
+def get_db_size(db: Database):
+    if db.db_type == "mysql":
+        return "MySQL"
+    db_path = os.path.join(BASE_DIR, "..", "ty_data.db")
+    if os.path.exists(db_path):
+        size_bytes = os.path.getsize(db_path)
         return f"{size_bytes / (1024 * 1024):.2f} MB"
     return "0 MB"
 
@@ -332,15 +440,15 @@ async def get_stats(x_secret: str = Header(None)):
     if x_secret != web_config.get("secret"):
         raise HTTPException(status_code=403, detail="Secret Invalid")
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM LOGDATA")
-    total_count = cursor.fetchone()[0]
-    conn.close()
+    with Database() as db:
+        cursor = db.execute("SELECT COUNT(*) AS cnt FROM LOGDATA")
+        row = db.fetchone(cursor)
+        total_count = int(row["cnt"]) if row else 0
+        db_size = get_db_size(db)
 
     return {
         "total_logs": total_count,
-        "db_size": get_db_size(),
+        "db_size": db_size,
         "server_time": int(time.time())
     }
 
@@ -388,143 +496,107 @@ async def get_logs(
         logging.debug(f"  dimension={dimension}")
         logging.debug(f"  has_coord_query={has_coord_query}")
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    with Database() as db:
+        try:
+            # 构建计数查询 - 用于获取总记录数
+            count_query = "SELECT COUNT(*) AS cnt FROM LOGDATA WHERE 1=1"
+            data_query = "SELECT * FROM LOGDATA WHERE 1=1"
+            count_params = []
+            data_params = []
 
-    try:
-        cursor = conn.cursor()
-        # 构建计数查询 - 用于获取总记录数
-        count_query = "SELECT COUNT(*) FROM LOGDATA WHERE 1=1"
-        data_query = "SELECT * FROM LOGDATA WHERE 1=1"
-        count_params = []
-        data_params = []
+            # 时间范围过滤
+            if start_time:
+                count_query += " AND time >= ?"
+                data_query += " AND time >= ?"
+                count_params.append(start_time)
+                data_params.append(start_time)
+            if end_time:
+                count_query += " AND time <= ?"
+                data_query += " AND time <= ?"
+                count_params.append(end_time)
+                data_params.append(end_time)
 
-        # 时间范围过滤
-        if start_time:
-            count_query += " AND time >= ?"
-            data_query += " AND time >= ?"
-            count_params.append(start_time)
-            data_params.append(start_time)
-        if end_time:
-            count_query += " AND time <= ?"
-            data_query += " AND time <= ?"
-            count_params.append(end_time)
-            data_params.append(end_time)
+            # 字段过滤（使用LIKE进行模糊匹配）
+            if filter_type and filter_value:
+                allowed_fields = ["id", "name", "type", "obj_id", "obj_name", "world", "status", "data"]
+                if filter_type in allowed_fields:
+                    count_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
+                    data_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
+                    count_params.append(f"%{filter_value}%")
+                    data_params.append(f"%{filter_value}%")
 
-        # 字段过滤（使用LIKE进行模糊匹配）
-        if filter_type and filter_value:
-            # 安全检查：防止 SQL 注入
-            allowed_fields = ["id", "name", "type", "obj_id", "obj_name", "world", "status", "data"]
-            if filter_type in allowed_fields:
-                # 关键修复：先确保字段不为NULL且不为空字符串，再进行LIKE匹配
-                # 这样可以避免NULL值导致的意外匹配
-                count_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
-                data_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
-                count_params.append(f"%{filter_value}%")
-                data_params.append(f"%{filter_value}%")
+            # 维度过滤
+            if dimension:
+                if dimension.lower() != "all" and dimension != "":
+                    count_query += " AND world = ?"
+                    data_query += " AND world = ?"
+                    count_params.append(dimension)
+                    data_params.append(dimension)
 
-        # 维度过滤 - 关键修复：正确处理维度参数
-        if dimension:
-            if dimension.lower() == "all" or dimension == "" or dimension is None:
-                # 全部维度，不做过滤
-                pass
-            else:
-                count_query += " AND world = ?"
-                data_query += " AND world = ?"
-                count_params.append(dimension)
-                data_params.append(dimension)
-
-        # 坐标范围过滤（独立于其他过滤器）
-        if has_coord_query:
-            # 先确保坐标值有效，避免NULL值导致的计算问题
-            valid_coord_condition = " AND pos_x IS NOT NULL AND pos_y IS NOT NULL AND pos_z IS NOT NULL"
-            count_query += valid_coord_condition
-            data_query += valid_coord_condition
-
-            # 使用欧几里得距离公式 (x-x0)² + (y-y0)² + (z-z0)² <= radius²
-            distance_condition = f"""
-                AND ((pos_x - ?) * (pos_x - ?) + 
-                    (pos_y - ?) * (pos_y - ?) + 
-                    (pos_z - ?) * (pos_z - ?)) <= (? * ?)
-            """
-            count_query += distance_condition
-            data_query += distance_condition
-            # 添加参数
-            params = [center_x, center_x, center_y, center_y, center_z, center_z, radius, radius]
-            count_params.extend(params)
-            data_params.extend(params)
-
-        # 记录SQL语句（调试模式）
-        if DEBUG_MODE:
-            logging.debug(f"计数查询SQL: {count_query}")
-            logging.debug(f"计数查询参数: {count_params}")
-            logging.debug(f"数据查询SQL: {data_query}")
-            logging.debug(f"数据查询参数: {data_params}")
-
-        # 执行计数查询
-        cursor.execute(count_query, count_params)
-        total_records = cursor.fetchone()[0]
-
-        # 计算分页
-        offset = (page - 1) * page_size
-        total_pages = (total_records + page_size - 1) // page_size  # 向上取整
-
-        # 构建数据查询（带排序和分页）
-        data_query += " ORDER BY time DESC LIMIT ? OFFSET ?"
-        data_params.extend([page_size, offset])
-
-        # 记录完整的SQL语句（调试模式）
-        if DEBUG_MODE:
-            logging.debug(f"最终数据查询SQL: {data_query}")
-            logging.debug(f"最终数据查询参数: {data_params}")
-
-        # 执行数据查询
-        cursor.execute(data_query, data_params)
-        rows = cursor.fetchall()
-
-        # 转换为字典列表
-        data = []
-        for row in rows:
-            record: Dict[str, Any] = dict(row)
-            # 为每条记录计算距离（如果进行了坐标查询）
+            # 坐标范围过滤
             if has_coord_query:
-                dx = float(record["pos_x"]) - center_x
-                dy = float(record["pos_y"]) - center_y
-                dz = float(record["pos_z"]) - center_z
-                distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-                record["distance"] = round(distance, 2)
-            data.append(record)
+                valid_coord_condition = " AND pos_x IS NOT NULL AND pos_y IS NOT NULL AND pos_z IS NOT NULL"
+                count_query += valid_coord_condition
+                data_query += valid_coord_condition
 
-        query_time = (time.time() - start_time_query) * 1000  # 转换为毫秒
+                distance_condition = """
+                    AND ((pos_x - ?) * (pos_x - ?) +
+                        (pos_y - ?) * (pos_y - ?) +
+                        (pos_z - ?) * (pos_z - ?)) <= (? * ?)
+                """
+                count_query += distance_condition
+                data_query += distance_condition
+                params = [center_x, center_x, center_y, center_y, center_z, center_z, radius, radius]
+                count_params.extend(params)
+                data_params.extend(params)
 
-        # 记录查询结果（调试模式）
-        if DEBUG_MODE:
-            logging.debug(f"查询结果: 找到 {len(data)} 条记录，总计 {total_records} 条")
-            logging.debug(f"查询耗时: {query_time:.2f} 毫秒")
-            if len(data) > 0:
-                # 只记录前几条记录的信息
-                for i, record in enumerate(data[:3]):
-                    logging.debug(
-                        f"记录 {i + 1}: id={record.get('id')}, name={record.get('name')}, type={record.get('type')}, obj_id={record.get('obj_id')}")
+            if DEBUG_MODE:
+                logging.debug(f"计数查询SQL: {count_query}")
+                logging.debug(f"计数查询参数: {count_params}")
 
-        return LogsResponse(
-            data=data,
-            total=total_records,
-            page=page,
-            page_size=page_size,
-            total_pages=total_pages,
-            query_time_ms=round(query_time, 2)
-        )
+            cursor = db.execute(count_query, count_params)
+            row = db.fetchone(cursor)
+            total_records = int(row["cnt"]) if row else 0
 
-    except sqlite3.Error as error:
-        current_data_query = locals().get('data_query', '未知查询')
-        current_data_params = locals().get('data_params', [])
-        logging.error(f"数据库查询错误: {str(error)}")
-        logging.error(f"出错的SQL语句: {current_data_query}")
-        logging.error(f"SQL参数: {current_data_params}")
-        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(error)}")
-    finally:
-        conn.close()
+            offset = (page - 1) * page_size
+            total_pages = (total_records + page_size - 1) // page_size
+
+            data_query += " ORDER BY time DESC LIMIT ? OFFSET ?"
+            data_params.extend([page_size, offset])
+
+            if DEBUG_MODE:
+                logging.debug(f"数据查询SQL: {data_query}")
+                logging.debug(f"数据查询参数: {data_params}")
+
+            cursor = db.execute(data_query, data_params)
+            rows = db.fetchall(cursor)
+
+            for record in rows:
+                if has_coord_query:
+                    dx = float(record["pos_x"]) - center_x
+                    dy = float(record["pos_y"]) - center_y
+                    dz = float(record["pos_z"]) - center_z
+                    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                    record["distance"] = round(distance, 2)
+
+            query_time = (time.time() - start_time_query) * 1000
+
+            if DEBUG_MODE:
+                logging.debug(f"查询结果: 找到 {len(rows)} 条记录，总计 {total_records} 条")
+                logging.debug(f"查询耗时: {query_time:.2f} 毫秒")
+
+            return LogsResponse(
+                data=rows,
+                total=total_records,
+                page=page,
+                page_size=page_size,
+                total_pages=total_pages,
+                query_time_ms=round(query_time, 2)
+            )
+
+        except Exception as error:
+            logging.error(f"数据库查询错误: {str(error)}")
+            raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(error)}")
 
 
 # 新增：批量查询接口（用于导出）
@@ -564,165 +636,129 @@ async def export_logs(
         logging.debug(f"  center_x={center_x}, center_y={center_y}, center_z={center_z}, radius={radius}")
         logging.debug(f"  dimension={dimension}")
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    with Database() as db:
+        try:
+            # 先获取满足条件的数据总数
+            count_query = "SELECT COUNT(*) AS cnt FROM LOGDATA WHERE 1=1"
+            count_params = []
 
-    try:
-        cursor = conn.cursor()
-
-        # 先获取满足条件的数据总数
-        count_query = "SELECT COUNT(*) FROM LOGDATA WHERE 1=1"
-        count_params = []
-
-        # 时间范围过滤
-        if start_time:
-            count_query += " AND time >= ?"
-            count_params.append(start_time)
-        if end_time:
-            count_query += " AND time <= ?"
-            count_params.append(end_time)
-
-        # 字段过滤（关键修复：需要与get_logs函数保持一致）
-        if filter_type and filter_value:
-            allowed_fields = ["id", "name", "type", "obj_id", "obj_name", "world", "status", "data"]
-            if filter_type in allowed_fields:
-                # 关键修复：先确保字段不为NULL且不为空字符串，再进行LIKE匹配
-                count_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
-                count_params.append(f"%{filter_value}%")
-
-        # 维度过滤 - 关键修复
-        if dimension and dimension.lower() != "all" and dimension != "" and dimension is not None:
-            count_query += " AND world = ?"
-            count_params.append(dimension)
-
-        # 坐标范围过滤
-        has_coord_query = all([center_x is not None, center_y is not None, center_z is not None, radius is not None])
-        if has_coord_query:
-            # 先确保坐标值有效，避免NULL值导致的计算问题
-            valid_coord_condition = " AND pos_x IS NOT NULL AND pos_y IS NOT NULL AND pos_z IS NOT NULL"
-            count_query += valid_coord_condition
-
-            distance_condition = f"""
-                AND ((pos_x - ?) * (pos_x - ?) + 
-                    (pos_y - ?) * (pos_y - ?) + 
-                    (pos_z - ?) * (pos_z - ?)) <= (? * ?)
-            """
-            count_query += distance_condition
-            params = [center_x, center_x, center_y, center_y, center_z, center_z, radius, radius]
-            count_params.extend(params)
-
-        # 记录计数查询SQL（调试模式）
-        if DEBUG_MODE:
-            logging.debug(f"导出计数查询SQL: {count_query}")
-            logging.debug(f"导出计数查询参数: {count_params}")
-
-        cursor.execute(count_query, count_params)
-        total_records = cursor.fetchone()[0]
-
-        # 计算实际的结束页码
-        total_pages = (total_records + page_size - 1) // page_size
-        actual_end_page = min(end_page, total_pages)
-
-        if start_page > total_pages:
-            logging.warning(f"导出请求开始页码 {start_page} 超出总页数 {total_pages}")
-            return {
-                "data": [],
-                "total_records": 0,
-                "exported_records": 0,
-                "pages_exported": 0,
-                "message": f"开始页码 {start_page} 超出总页数 {total_pages}"
-            }
-
-        # 循环获取所有页的数据
-        all_data = []
-        for page_num in range(start_page, actual_end_page + 1):
-            offset = (page_num - 1) * page_size
-
-            data_query = "SELECT * FROM LOGDATA WHERE 1=1"
-            data_params = []
-
-            # 时间范围过滤
             if start_time:
-                data_query += " AND time >= ?"
-                data_params.append(start_time)
+                count_query += " AND time >= ?"
+                count_params.append(start_time)
             if end_time:
-                data_query += " AND time <= ?"
-                data_params.append(end_time)
+                count_query += " AND time <= ?"
+                count_params.append(end_time)
 
-            # 字段过滤（关键修复：需要与计数查询保持一致）
             if filter_type and filter_value:
                 allowed_fields = ["id", "name", "type", "obj_id", "obj_name", "world", "status", "data"]
                 if filter_type in allowed_fields:
-                    # 关键修复：先确保字段不为NULL且不为空字符串，再进行LIKE匹配
-                    data_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
-                    data_params.append(f"%{filter_value}%")
+                    count_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
+                    count_params.append(f"%{filter_value}%")
 
-            # 维度过滤 - 关键修复
-            if dimension and dimension.lower() != "all" and dimension != "" and dimension is not None:
-                data_query += " AND world = ?"
-                data_params.append(dimension)
+            if dimension and dimension.lower() != "all" and dimension != "":
+                count_query += " AND world = ?"
+                count_params.append(dimension)
 
-            # 坐标范围过滤
+            has_coord_query = all([center_x is not None, center_y is not None, center_z is not None, radius is not None])
             if has_coord_query:
-                distance_condition = f"""
-                    AND ((pos_x - ?) * (pos_x - ?) + 
-                         (pos_y - ?) * (pos_y - ?) + 
-                         (pos_z - ?) * (pos_z - ?)) <= (? * ?)
+                count_query += " AND pos_x IS NOT NULL AND pos_y IS NOT NULL AND pos_z IS NOT NULL"
+                distance_condition = """
+                    AND ((pos_x - ?) * (pos_x - ?) +
+                        (pos_y - ?) * (pos_y - ?) +
+                        (pos_z - ?) * (pos_z - ?)) <= (? * ?)
                 """
-                data_query += distance_condition
+                count_query += distance_condition
                 params = [center_x, center_x, center_y, center_y, center_z, center_z, radius, radius]
-                data_params.extend(params)
+                count_params.extend(params)
 
-            data_query += " ORDER BY time DESC LIMIT ? OFFSET ?"
-            data_params.extend([page_size, offset])
-
-            # 记录每页的SQL（调试模式）
             if DEBUG_MODE:
-                logging.debug(f"导出第 {page_num} 页SQL: {data_query}")
-                logging.debug(f"导出第 {page_num} 页参数: {data_params}")
+                logging.debug(f"导出计数查询SQL: {count_query}")
+                logging.debug(f"导出计数查询参数: {count_params}")
 
-            cursor.execute(data_query, data_params)
-            rows = cursor.fetchall()
-            for row in rows:
-                record: Dict[str, Any] = dict(row)
-                # 为每条记录计算距离（如果进行了坐标查询）
+            cursor = db.execute(count_query, count_params)
+            row = db.fetchone(cursor)
+            total_records = int(row["cnt"]) if row else 0
+
+            total_pages = (total_records + page_size - 1) // page_size
+            actual_end_page = min(end_page, total_pages)
+
+            if start_page > total_pages:
+                logging.warning(f"导出请求开始页码 {start_page} 超出总页数 {total_pages}")
+                return {
+                    "data": [],
+                    "total_records": 0,
+                    "exported_records": 0,
+                    "pages_exported": 0,
+                    "message": f"开始页码 {start_page} 超出总页数 {total_pages}"
+                }
+
+            all_data = []
+            for page_num in range(start_page, actual_end_page + 1):
+                offset_val = (page_num - 1) * page_size
+
+                data_query = "SELECT * FROM LOGDATA WHERE 1=1"
+                data_params = []
+
+                if start_time:
+                    data_query += " AND time >= ?"
+                    data_params.append(start_time)
+                if end_time:
+                    data_query += " AND time <= ?"
+                    data_params.append(end_time)
+
+                if filter_type and filter_value:
+                    allowed_fields = ["id", "name", "type", "obj_id", "obj_name", "world", "status", "data"]
+                    if filter_type in allowed_fields:
+                        data_query += f" AND ({filter_type} IS NOT NULL AND {filter_type} != '' AND {filter_type} LIKE ?)"
+                        data_params.append(f"%{filter_value}%")
+
+                if dimension and dimension.lower() != "all" and dimension != "":
+                    data_query += " AND world = ?"
+                    data_params.append(dimension)
+
                 if has_coord_query:
-                    dx = float(record["pos_x"]) - center_x
-                    dy = float(record["pos_y"]) - center_y
-                    dz = float(record["pos_z"]) - center_z
-                    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-                    record["distance"] = round(distance, 2)
-                all_data.append(record)
+                    distance_condition = """
+                        AND ((pos_x - ?) * (pos_x - ?) +
+                             (pos_y - ?) * (pos_y - ?) +
+                             (pos_z - ?) * (pos_z - ?)) <= (? * ?)
+                    """
+                    data_query += distance_condition
+                    params = [center_x, center_x, center_y, center_y, center_z, center_z, radius, radius]
+                    data_params.extend(params)
 
-        # 记录导出结果（调试模式）
-        if DEBUG_MODE:
-            logging.debug(f"导出结果: 共导出 {len(all_data)} 条记录")
-            logging.debug(f"导出页数: 从 {start_page} 页到 {actual_end_page} 页")
-            if len(all_data) > 0:
-                # 只记录前几条记录的信息
-                for i, record in enumerate(all_data[:3]):
-                    logging.debug(
-                        f"导出记录 {i + 1}: id={record.get('id')}, name={record.get('name')}, type={record.get('type')}, obj_id={record.get('obj_id')}")
+                data_query += " ORDER BY time DESC LIMIT ? OFFSET ?"
+                data_params.extend([page_size, offset_val])
 
-        return {
-            "data": all_data,
-            "total_records": total_records,
-            "exported_records": len(all_data),
-            "pages_exported": actual_end_page - start_page + 1,
-            "start_page": start_page,
-            "end_page": actual_end_page,
-            "total_pages": total_pages
-        }
+                if DEBUG_MODE:
+                    logging.debug(f"导出第 {page_num} 页SQL: {data_query}")
 
-    except sqlite3.Error as error:
-        current_data_query = locals().get('data_query', '未知查询')
-        current_data_params = locals().get('data_params', [])
-        logging.error(f"导出数据错误: {str(error)}")
-        logging.error(f"出错的SQL语句: {current_data_query}")
-        logging.error(f"SQL参数: {current_data_params}")
-        raise HTTPException(status_code=500, detail=f"导出数据错误: {str(error)}")
-    finally:
-        conn.close()
+                cursor = db.execute(data_query, data_params)
+                rows = db.fetchall(cursor)
+                for record in rows:
+                    if has_coord_query:
+                        dx = float(record["pos_x"]) - center_x
+                        dy = float(record["pos_y"]) - center_y
+                        dz = float(record["pos_z"]) - center_z
+                        distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                        record["distance"] = round(distance, 2)
+                    all_data.append(record)
+
+            if DEBUG_MODE:
+                logging.debug(f"导出结果: 共导出 {len(all_data)} 条记录")
+
+            return {
+                "data": all_data,
+                "total_records": total_records,
+                "exported_records": len(all_data),
+                "pages_exported": actual_end_page - start_page + 1,
+                "start_page": start_page,
+                "end_page": actual_end_page,
+                "total_pages": total_pages
+            }
+
+        except Exception as error:
+            logging.error(f"导出数据错误: {str(error)}")
+            raise HTTPException(status_code=500, detail=f"导出数据错误: {str(error)}")
 
 
 # 新增：获取数据库索引状态和建议
@@ -732,25 +768,42 @@ async def get_db_info(x_secret: str = Header(None)):
     if x_secret != web_config.get("secret"):
         raise HTTPException(status_code=403, detail="Secret Invalid")
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    with Database() as db:
+        if db.db_type == "sqlite":
+            cursor = db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row["name"] for row in db.fetchall(cursor)]
 
-    try:
-        # 获取表信息
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = [row[0] for row in cursor.fetchall()]
+            cursor = db.execute("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='LOGDATA'")
+            indexes = [row["name"] for row in db.fetchall(cursor)]
 
-        # 获取索引信息
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='LOGDATA'")
-        indexes = [row[0] for row in cursor.fetchall()]
+            cursor = db.execute("PRAGMA table_info(LOGDATA)")
+            columns = [{"name": row["name"], "type": row["type"], "notnull": row["notnull"], "pk": row["pk"]} for row in db.fetchall(cursor)]
 
-        # 获取列信息
-        cursor.execute("PRAGMA table_info(LOGDATA)")
-        columns = [{"name": row[1], "type": row[2], "notnull": row[3], "pk": row[5]} for row in cursor.fetchall()]
+            cursor = db.execute("SELECT COUNT(*) AS cnt FROM LOGDATA")
+            row = db.fetchone(cursor)
+            total_rows = int(row["cnt"]) if row else 0
+        else:
+            cursor = db.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = ?", [db.database])
+            tables = [row["table_name"] for row in db.fetchall(cursor)]
 
-        # 分析查询性能
-        cursor.execute("SELECT COUNT(*) FROM LOGDATA")
-        total_rows = cursor.fetchone()[0]
+            cursor = db.execute("""
+                SELECT index_name FROM information_schema.statistics
+                WHERE table_schema = ? AND table_name = 'LOGDATA'
+                GROUP BY index_name
+            """, [db.database])
+            indexes = [row["index_name"] for row in db.fetchall(cursor)]
+
+            cursor = db.execute("""
+                SELECT column_name AS name, column_type AS type,
+                       is_nullable AS notnull, column_key AS pk
+                FROM information_schema.columns
+                WHERE table_schema = ? AND table_name = 'LOGDATA'
+            """, [db.database])
+            columns = [dict(row) for row in db.fetchall(cursor)]
+
+            cursor = db.execute("SELECT COUNT(*) AS cnt FROM LOGDATA")
+            row = db.fetchone(cursor)
+            total_rows = int(row["cnt"]) if row else 0
 
         return {
             "tables": tables,
@@ -758,8 +811,6 @@ async def get_db_info(x_secret: str = Header(None)):
             "columns": columns,
             "total_rows": total_rows
         }
-    finally:
-        conn.close()
 
 
 # 用于调试
@@ -783,35 +834,25 @@ async def debug_query(
     if not sql.strip().upper().startswith("SELECT"):
         raise HTTPException(status_code=400, detail="只允许SELECT查询")
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    with Database() as db:
+        try:
+            logging.info(f"调试查询执行SQL: {sql}")
 
-    try:
-        cursor = conn.cursor()
-        logging.info(f"调试查询执行SQL: {sql}")
+            cursor = db.execute(sql)
+            rows = db.fetchall(cursor)
 
-        cursor.execute(sql)
-        rows = cursor.fetchall()
-
-        # 转换为字典列表
-        data = []
-        for row in rows:
-            data.append(dict(row))
-
-        return {
-            "success": True,
-            "row_count": len(data),
-            "data": data[:100],  # 限制返回前100条
-            "total": len(data)
-        }
-    except sqlite3.Error as error:
-        logging.error(f"调试查询错误: {str(error)}")
-        return {
-            "success": False,
-            "error": str(error)
-        }
-    finally:
-        conn.close()
+            return {
+                "success": True,
+                "row_count": len(rows),
+                "data": rows[:100],
+                "total": len(rows)
+            }
+        except Exception as error:
+            logging.error(f"调试查询错误: {str(error)}")
+            return {
+                "success": False,
+                "error": str(error)
+            }
 
 
 @app.get("/")
@@ -832,7 +873,7 @@ if __name__ == "__main__":
     # 检查是否以调试模式启动
     if DEBUG_MODE:
         print(f"Boot mode: DEBUG")
-        print(f"Database Path: {DB_PATH}")
+        print(f"Database: {DB_PATH} (type: sqlite by default, see ../config.json)")
         print(f"Config file: {CONFIG_PATH}")
         print(f"Log file: {LOG_PATH}")
         print(f"Languages Path: {LANGUAGES_DIR}")
