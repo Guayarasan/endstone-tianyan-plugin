@@ -424,6 +424,14 @@ async def get_language(lang_code: str):
 # 辅助函数：获取文件大小或 MySQL 标识
 def get_db_size(db: Database):
     if db.db_type == "mysql":
+        cursor = db.execute(
+            "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb "
+            "FROM information_schema.tables WHERE table_schema = ?",
+            [db.database]
+        )
+        row = db.fetchone(cursor)
+        if row and row["size_mb"] is not None:
+            return f"{float(row['size_mb']):.2f} MB"
         return "MySQL"
     db_path = os.path.join(BASE_DIR, "..", "ty_data.db")
     if os.path.exists(db_path):
@@ -546,6 +554,16 @@ async def get_logs(
                 valid_coord_condition = " AND pos_x IS NOT NULL AND pos_y IS NOT NULL AND pos_z IS NOT NULL"
                 count_query += valid_coord_condition
                 data_query += valid_coord_condition
+
+                # 矩形预过滤 — 利用索引快速排除框外数据，减少距离公式计算量
+                bbox = (center_x - radius, center_x + radius,
+                        center_y - radius, center_y + radius,
+                        center_z - radius, center_z + radius)
+                bbox_sql = " AND pos_x >= ? AND pos_x <= ? AND pos_y >= ? AND pos_y <= ? AND pos_z >= ? AND pos_z <= ?"
+                count_query += bbox_sql
+                data_query += bbox_sql
+                count_params.extend(bbox)
+                data_params.extend(bbox)
 
                 distance_condition = """
                     AND ((pos_x - ?) * (pos_x - ?) +
@@ -670,6 +688,11 @@ async def export_logs(
             has_coord_query = all([center_x is not None, center_y is not None, center_z is not None, radius is not None])
             if has_coord_query:
                 count_query += " AND pos_x IS NOT NULL AND pos_y IS NOT NULL AND pos_z IS NOT NULL"
+                bbox = (center_x - radius, center_x + radius,
+                        center_y - radius, center_y + radius,
+                        center_z - radius, center_z + radius)
+                count_query += " AND pos_x >= ? AND pos_x <= ? AND pos_y >= ? AND pos_y <= ? AND pos_z >= ? AND pos_z <= ?"
+                count_params.extend(bbox)
                 distance_condition = """
                     AND ((pos_x - ?) * (pos_x - ?) +
                         (pos_y - ?) * (pos_y - ?) +
@@ -725,6 +748,11 @@ async def export_logs(
                     data_params.append(dimension)
 
                 if has_coord_query:
+                    bbox = (center_x - radius, center_x + radius,
+                            center_y - radius, center_y + radius,
+                            center_z - radius, center_z + radius)
+                    data_query += " AND pos_x >= ? AND pos_x <= ? AND pos_y >= ? AND pos_y <= ? AND pos_z >= ? AND pos_z <= ?"
+                    data_params.extend(bbox)
                     distance_condition = """
                         AND ((pos_x - ?) * (pos_x - ?) +
                              (pos_y - ?) * (pos_y - ?) +

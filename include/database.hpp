@@ -157,6 +157,11 @@ namespace yuhangle {
                 return rc;
             }
 
+            // 为坐标查询创建复合索引
+            sqlite3_exec(conn->get(), "CREATE INDEX IF NOT EXISTS idx_logdata_pos ON LOGDATA(pos_x, pos_y, pos_z)", nullptr, nullptr, nullptr);
+            // 为时间范围查询创建索引
+            sqlite3_exec(conn->get(), "CREATE INDEX IF NOT EXISTS idx_logdata_time ON LOGDATA(time)", nullptr, nullptr, nullptr);
+
             pool.returnConnection(conn);
             return SQLITE_OK;
         }
