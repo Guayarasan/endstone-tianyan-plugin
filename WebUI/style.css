@@ -42,11 +42,11 @@ body {
 
 .dashboard-container {
     flex: 1;
-    padding: 24px;
+    padding: 12px 16px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 10px;
 }
 
 /* 卡片 */
@@ -54,7 +54,7 @@ body {
     background: var(--surface-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
-    padding: 24px;
+    padding: 14px 18px;
     transition: box-shadow 0.3s ease;
 }
 .card:hover { box-shadow: var(--shadow-md); }
@@ -62,16 +62,16 @@ body {
 /* 按钮 */
 .btn {
     border: none;
-    padding: 8px 20px;
+    padding: 6px 14px;
     border-radius: var(--radius-pill);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 14px;
+    font-size: 13px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
 }
 .btn-primary { background-color: var(--primary-color); color: white; }
 .btn-primary:hover { background-color: var(--primary-dark); box-shadow: 0 2px 4px rgba(98, 0, 238, 0.3); }
@@ -150,8 +150,10 @@ select option {
 
 /* 日期时间输入框 */
 .datetime-input {
-    min-width: 180px;
+    min-width: 160px;
 }
+.filter-item input { padding: 7px 12px; font-size: 13px; }
+.filter-item select { padding: 7px 12px; font-size: 13px; }
 
 /* 登录页特定 */
 .login-box { width: 400px; max-width: 90%; text-align: center; }
@@ -160,7 +162,7 @@ select option {
 /* 头部 */
 header {
     background: var(--surface-color);
-    padding: 12px 32px;
+    padding: 8px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -183,38 +185,38 @@ header {
 }
 
 /* 状态统计 */
-.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-.stat-card { text-align: center; padding: 16px; }
-.stat-value { font-size: 24px; font-weight: bold; color: var(--primary-color); margin: 6px 0; }
-.stat-label { color: var(--text-secondary); font-size: 13px; }
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.stat-card { text-align: center; padding: 8px 10px; }
+.stat-value { font-size: 20px; font-weight: bold; color: var(--primary-color); margin: 2px 0; }
+.stat-label { color: var(--text-secondary); font-size: 12px; }
 .flex-center { display: flex; align-items: center; justify-content: center; }
 
 /* 筛选区域 */
-.filter-section { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
-.filter-row { display: flex; gap: 12px; width: 100%; flex-wrap: wrap; }
-.filter-item { flex: 1; min-width: 150px; }
+.filter-section { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.filter-row { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; }
+.filter-item { flex: 1; min-width: 130px; }
 
 .coord-group {
-    display: flex; gap: 8px; background: #f1f3f4; padding: 12px;
+    display: flex; gap: 6px; background: #f1f3f4; padding: 8px 10px;
     border-radius: var(--radius-md); flex-wrap: wrap; width: 100%;
     align-items: center;
 }
-.coord-title { width: 100%; font-size: 12px; color: var(--primary-color); font-weight: bold; margin-bottom: 5px; }
+.coord-title { width: 100%; font-size: 11px; color: var(--primary-color); font-weight: bold; margin-bottom: 2px; }
 .coord-input {
-    width: 80px;
-    padding: 8px 10px;
+    width: 72px;
+    padding: 6px 8px;
     border-radius: var(--radius-input);
     border: 1px solid var(--border-color);
-    box-sizing: border-box; /* 确保padding不影响宽度 */
+    box-sizing: border-box;
 }
-.coord-radius-group { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.coord-radius-group { display: flex; align-items: center; gap: 5px; font-size: 11px; }
 .dim-select {
-    width: 120px;
+    width: 110px;
     border-radius: var(--radius-input) !important;
     border: 1px solid var(--border-color);
-    box-sizing: border-box; /* 确保padding不影响宽度 */
+    box-sizing: border-box;
 }
-.action-buttons { justify-content: flex-end; margin-top: 10px; }
+.action-buttons { justify-content: flex-end; margin-top: 4px; }
 
 /* 表格区域 */
 .table-container {
@@ -223,7 +225,7 @@ header {
     background: white;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
-    min-height: 300px;
+    min-height: 200px;
     position: relative;
 }
 table { width: 100%; border-collapse: collapse; min-width: 1200px; }
@@ -233,13 +235,13 @@ th {
     top: 0;
     z-index: 1;
     text-align: left;
-    padding: 14px 16px;
+    padding: 10px 12px;
     font-weight: 600;
     color: var(--text-secondary);
     border-bottom: 2px solid var(--border-color);
     font-size: 13px;
 }
-td { padding: 10px 16px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
+td { padding: 7px 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
 tr:hover { background-color: #f8f9fa; }
 
 /* 数据展示组件 */
@@ -263,9 +265,8 @@ tr:hover { background-color: #f8f9fa; }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 16px;
-    padding: 12px 24px !important;
-    min-height: 50px;
+    padding: 8px 16px !important;
+    min-height: 40px;
 }
 .page-info { color: var(--text-secondary); font-size: 13px; }
 .page-controls {
