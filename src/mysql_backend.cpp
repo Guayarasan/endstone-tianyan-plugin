@@ -56,7 +56,9 @@ int MysqlBackend::searchLog(std::vector<std::map<std::string, std::string>>& res
                             const std::pair<std::string, double>& key,
                             std::atomic<bool>* cancel) {
     if (cancel && *cancel) return -1;
-    auto qr = mysql_->search_logs(key.first, key.second);
+    auto qr = cancel
+        ? mysql_->search_logs_with_cancel(key.first, key.second, [cancel]() { return cancel->load(); })
+        : mysql_->search_logs(key.first, key.second);
     if (cancel && *cancel) return -1;
     result.clear();
     result.reserve(qr.rows.size());
@@ -72,7 +74,10 @@ int MysqlBackend::searchLog(std::vector<std::map<std::string, std::string>>& res
                             const std::string& world,
                             std::atomic<bool>* cancel) {
     if (cancel && *cancel) return -1;
-    auto qr = mysql_->search_logs_by_pos(key.first, key.second, x, y, z, r, world);
+    auto qr = cancel
+        ? mysql_->search_logs_by_pos_with_cancel(key.first, key.second, x, y, z, r, world,
+            [cancel]() { return cancel->load(); })
+        : mysql_->search_logs_by_pos(key.first, key.second, x, y, z, r, world);
     if (cancel && *cancel) return -1;
     result.clear();
     result.reserve(qr.rows.size());
