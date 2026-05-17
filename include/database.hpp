@@ -639,7 +639,7 @@ namespace yuhangle {
             const long long timeThreshold = currentTime - static_cast<long long>(searchCriteria.second * 3600);
 
             // 使用参数化查询防止SQL注入
-            const std::string sql = "SELECT * FROM LOGDATA WHERE (name LIKE ? OR type LIKE ? OR data LIKE ?) AND time >= ?";
+            const std::string sql = "SELECT * FROM LOGDATA WHERE (name LIKE ? OR type LIKE ? OR data LIKE ?) AND time >= ? ORDER BY time";
 
             sqlite3_stmt* stmt;
             int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
@@ -718,7 +718,8 @@ namespace yuhangle {
                   "AND pos_x >= ? AND pos_x <= ? "
                   "AND pos_y >= ? AND pos_y <= ? "
                   "AND pos_z >= ? AND pos_z <= ? "
-                  "AND ((pos_x - ?)*(pos_x - ?) + (pos_y - ?)*(pos_y - ?) + (pos_z - ?)*(pos_z - ?)) <= ?";
+                  "AND ((pos_x - ?)*(pos_x - ?) + (pos_y - ?)*(pos_y - ?) + (pos_z - ?)*(pos_z - ?)) <= ? "
+                  "ORDER BY time";
 
             sqlite3_stmt* stmt;
             int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
