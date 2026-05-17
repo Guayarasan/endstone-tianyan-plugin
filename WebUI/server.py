@@ -269,6 +269,14 @@ class Database:
 
         if db_type == "mysql":
             try:
+                # 添加 Endstone 插件依赖路径（pymysql 被安装在这里而非 venv site-packages）
+                _plugin_site = os.path.join(
+                    BASE_DIR, "..", "..", ".local", "lib",
+                    f"python{sys.version_info.major}.{sys.version_info.minor}",
+                    "site-packages"
+                )
+                if os.path.isdir(_plugin_site):
+                    sys.path.insert(0, _plugin_site)
                 import pymysql
                 mysql_cfg = _load_mysql_config()
                 self.conn = pymysql.connect(
