@@ -36,14 +36,8 @@ FetchContent_Declare(
 
 # FetchContent doesn't add_subdirectory automatically for single-project repos;
 # we must do so explicitly so the INTERFACE target is available.
-FetchContent_GetProperties(endstone_mysql_api)
-if (NOT endstone_mysql_api_POPULATED)
-    FetchContent_Populate(endstone_mysql_api)
-    add_subdirectory(
-        ${endstone_mysql_api_SOURCE_DIR}
-        ${endstone_mysql_api_BINARY_DIR}
-    )
-endif()
+# endstone-mysql-api 是一个 header-only 接口库
+FetchContent_MakeAvailable(endstone_mysql_api)
 
 # SQLite3
 find_package(SQLite3 REQUIRED)

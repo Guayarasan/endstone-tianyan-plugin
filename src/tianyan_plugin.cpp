@@ -235,9 +235,8 @@ void TianyanPlugin::migrateOldBanData()
 
 
 #ifdef _WIN32
-    #include <windows.h>
     // Windows 下使用 HANDLE 记录进程
-    static HANDLE g_web_handle = NULL;
+    static HANDLE g_web_handle = nullptr;
 #else
     #include <unistd.h>
     #include <csignal>
@@ -265,7 +264,7 @@ void start_web_server(const std::string& pluginDir) {
     // 创建一个临时 buffer
     char* cmd_buf = _strdup(cmd.c_str());
 
-    if (CreateProcessA(NULL, cmd_buf, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+    if (CreateProcessA(nullptr, cmd_buf, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
         g_web_handle = pi.hProcess; // 保存进程句柄用于后续关闭
         CloseHandle(pi.hThread);    // 直接关闭
         std::cout << "[Tianyan] WebUI started (PID: " << pi.dwProcessId << ")" << std::endl;
@@ -285,7 +284,7 @@ void start_web_server(const std::string& pluginDir) {
 
 void stop_web_server() {
 #ifdef _WIN32
-    if (g_web_handle != NULL) {
+    if (g_web_handle != nullptr) {
         // 尝试关闭进程
         if (TerminateProcess(g_web_handle, 0)) {
             std::cout << "[Tianyan] Web server process terminated." << std::endl;
@@ -293,7 +292,7 @@ void stop_web_server() {
             std::cerr << "[Tianyan] Failed to terminate web server. Error: " << GetLastError() << std::endl;
         }
         CloseHandle(g_web_handle); // 释放句柄资源
-        g_web_handle = NULL;
+        g_web_handle = nullptr;
     }
 #else
     if (g_web_pid > 0) {
@@ -331,6 +330,28 @@ void TianyanPlugin::dump_webui_log_once() const
 }
 #endif
 
+void TianyanPlugin::default_init_sqlite_() {
+    // 默认使用 SQLite
+    namespace fs = std::filesystem;
+    try {
+        const fs::path currentPath = fs::current_path();
+        const fs::path fullPath = currentPath / TianyanCore::dbPath;
+        db_backend_ = std::make_unique<SqliteBackend>(fullPath.string());
+    } catch (const std::exception& e) {
+        getLogger().error("Failed to create SQLite backend: {}", e.what());
+        getServer().getPluginManager().disablePlugin(*this);
+        return;
+    }
+
+    // 初始化数据库
+    if (db_backend_->init_database() != 0) {
+        getLogger().error("Database initialization failed!");
+        getServer().getPluginManager().disablePlugin(*this);
+        return;
+    }
+    is_db_over = true;
+}
+
 void TianyanPlugin::onLoad()
 {
     getLogger().info("onLoad is called");
@@ -366,37 +387,36 @@ void TianyanPlugin::onEnable()
 
     // 创建数据库后端
     if (db_type == "mysql") {
-        if (auto* mysql_plugin = getServer().getPluginManager().getPlugin("mysql_api"); mysql_plugin && mysql_plugin->isEnabled()) {
-            if (auto mysql_service = getServer().getServiceManager().load<mysql_api::MySQLAPI>("MySQLAPI"); mysql_service && mysql_service->is_connected()) {
-                db_backend_ = std::make_unique<MysqlBackend>(mysql_service);
-                getLogger().info("Using MySQL database backend");
+        mysql_get_ = getServer().getScheduler().runTaskTimer(*this, [this]() {
+            if (const auto* mysql_plugin = getServer().getPluginManager().getPlugin("mysql_api"); mysql_plugin && mysql_plugin->isEnabled()) {
+                if (auto mysql_service = getServer().getServiceManager().load<mysql_api::MySQLAPI>("MySQLAPI"); mysql_service && mysql_service->is_connected()) {
+                    db_backend_ = std::make_unique<MysqlBackend>(mysql_service);
+                    getLogger().info("Using MySQL database backend");
+
+                    // 初始化数据库
+                    if (db_backend_->init_database() != 0) {
+                        getLogger().error("Database initialization failed!");
+                        getServer().getPluginManager().disablePlugin(*this);
+                        return;
+                    }
+                    is_db_over = true;
+                    //重载核心
+                    tyCore = std::make_unique<TianyanCore>(*db_backend_);
+                    getServer().getScheduler().cancelTask(mysql_get_->getTaskId());
+                } else {
+                    getLogger().warning("MySQLAPI is not connected, falling back to SQLite");
+                    default_init_sqlite_();
+                    getServer().getScheduler().cancelTask(mysql_get_->getTaskId());
+                }
             } else {
-                getLogger().warning("MySQLAPI is not connected, falling back to SQLite");
+                getLogger().warning("MySQLAPI plugin not found, falling back to SQLite");
+                default_init_sqlite_();
+                getServer().getScheduler().cancelTask(mysql_get_->getTaskId());
             }
-        } else {
-            getLogger().warning("MySQLAPI plugin not found, falling back to SQLite");
-        }
+        }, 100, 20);
     }
-
-    if (!db_backend_) {
-        // 默认使用 SQLite
-        namespace fs = std::filesystem;
-        try {
-            const fs::path currentPath = fs::current_path();
-            const fs::path fullPath = currentPath / TianyanCore::dbPath;
-            db_backend_ = std::make_unique<SqliteBackend>(fullPath.string());
-        } catch (const std::exception& e) {
-            getLogger().error("Failed to create SQLite backend: {}", e.what());
-            getServer().getPluginManager().disablePlugin(*this);
-            return;
-        }
-    }
-
-    // 初始化数据库
-    if (db_backend_->init_database() != 0) {
-        getLogger().error("Database initialization failed!");
-        getServer().getPluginManager().disablePlugin(*this);
-        return;
+    else if (db_type == "sqlite") {
+        default_init_sqlite_();
     }
 
     // 创建核心逻辑层
@@ -456,14 +476,14 @@ void TianyanPlugin::onEnable()
     registerEvent(&EventListener::onPlayerSendMSG, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerSendCMD, *eventListener_, endstone::EventPriority::Monitor);
     registerEvent(&EventListener::onPlayerTryJoin, *eventListener_, endstone::EventPriority::Monitor);
-    const string LOGO = R"(
+    constexpr string_view LOGO = R"(
 _____   _
 |_   _| (_)  __ _   _ _    _  _   __ _   _ _
 | |   | | / _` | | ' \  | || | / _` | | ' \
 |_|   |_| \__,_| |_||_|  \_, | \__,_| |_||_|
                         |__/
     )";
-    getLogger().info(endstone::ColorFormat::Yellow+LOGO);
+    getLogger().info(endstone::ColorFormat::Yellow + string(LOGO));
     const auto p_version = getServer().getPluginManager().getPlugin("tianyan_plugin")->getDescription().getVersion();
     getLogger().info(endstone::ColorFormat::Yellow + Tran->getLocal("Tianyan Plugin Version: ") + p_version);
     getLogger().info(endstone::ColorFormat::Yellow + Tran->getLocal("Repo: ")+"https://github.com/yuhangle/endstone-tianyan-plugin");
@@ -1129,10 +1149,9 @@ void TianyanPlugin::updateRevertStatus() const
 std::string StaticTranslate::get(const std::string& key) {
     try {
         namespace fs = std::filesystem;
-        const std::string config_path = "plugins/tianyan_data/config.json";
-        const std::string lang_dir = "plugins/tianyan_data/language/";
+        constexpr auto lang_dir   = "plugins/tianyan_data/language/";
         std::string lang = "en_US";
-        if (fs::exists(config_path)) {
+        if (constexpr auto config_path = "plugins/tianyan_data/config.json"; fs::exists(config_path)) {
             std::ifstream i(config_path);
             json j;
             i >> j;

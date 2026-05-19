@@ -5,6 +5,8 @@
 #include "../include/tianyan_core.h"
 #include <stdexcept>
 
+#include "global.h"
+
 TianyanCore::TianyanCore(IDatabaseBackend& db) : db_backend_(db) {};
 
 long long TianyanCore::stringToTimestamp(const std::string& timestampStr) {
@@ -39,6 +41,7 @@ std::string TianyanCore::timestampToString(const long long timestamp) {
 }
 
 int TianyanCore::recordLog(const LogData& logData) const {
+    if (!is_db_over) {return 1;}
     return db_backend_.addLog(logData.uuid, logData.id, logData.name,
                               logData.pos_x, logData.pos_y, logData.pos_z,
                               logData.world, logData.obj_id, logData.obj_name,
@@ -46,6 +49,7 @@ int TianyanCore::recordLog(const LogData& logData) const {
 }
 
 int TianyanCore::recordLogs(const std::vector<LogData>& logDatas) const {
+    if (!is_db_over) {return 1;}
     std::vector<DatabaseLogEntry> entries;
     entries.reserve(logDatas.size());
     for (const auto& [uuid, id, name, pos_x, pos_y, pos_z, world, obj_id, obj_name, time, type, data, status] : logDatas) {
@@ -55,6 +59,7 @@ int TianyanCore::recordLogs(const std::vector<LogData>& logDatas) const {
 }
 
 vector<TianyanCore::LogData> TianyanCore::searchLog(const pair<string, double>& key, atomic<bool>* cancel) const {
+    if (!is_db_over) {return {};}
     std::vector<std::map<std::string, std::string>> result;
     if (cancel && *cancel) return {};
     if (db_backend_.searchLog(result, key, cancel) != 0) return {};
@@ -87,6 +92,7 @@ vector<TianyanCore::LogData> TianyanCore::searchLog(const pair<string, double>& 
                                                      const double x, const double y, const double z,
                                                      const double r, const string& world,
                                                      atomic<bool>* cancel) const {
+    if (!is_db_over) {return {};}
     std::vector<std::map<std::string, std::string>> result;
     if (cancel && *cancel) return {};
     if (db_backend_.searchLog(result, key, x, y, z, r, world, cancel) != 0) return {};

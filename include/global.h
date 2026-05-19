@@ -4,7 +4,6 @@
 
 #ifndef TIANYAN_GLOBAL_H
 #define TIANYAN_GLOBAL_H
-#include "database.hpp"
 #include "tianyan_core.h"
 #include <nlohmann/json.hpp>
 #include <condition_variable>
@@ -15,5 +14,7 @@ inline vector<TianyanCore::LogData> logDataCache;
 inline vector<TianyanCore::BanIDPlayer> BanIDPlayers;
 //缓存锁
 inline std::mutex cacheMutex;
+//数据库状态
+inline bool is_db_over = false;
 
 #endif //TIANYAN_GLOBAL_H

@@ -5,7 +5,6 @@
 
 #include <endstone/plugin/plugin.h>
 #include <string>
-#include <fstream>
 #include <mutex>
 #include "database_backend.h"
 #include "tianyan_protect.h"
@@ -97,4 +96,6 @@ private:
 #ifdef _WIN32
     void dump_webui_log_once() const;
 #endif
+    shared_ptr<endstone::Task> mysql_get_;
+    void default_init_sqlite_();
 };
