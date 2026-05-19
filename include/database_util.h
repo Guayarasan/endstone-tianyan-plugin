@@ -109,7 +109,7 @@ inline int stringToInt(const std::string& str) {
 }
 
 inline std::string generate_uuid_v4() {
-    static thread_local std::mt19937 gen{std::random_device{}()};
+    thread_local std::mt19937 gen{std::random_device{}()};
 
     std::uniform_int_distribution<int> dis(0, 15);
 

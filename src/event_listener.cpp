@@ -134,11 +134,12 @@ void EventListener::onPlayerRightClickBlock(const endstone::PlayerInteractEvent&
     bool danger_item = false;
     if (event.hasItem())
     {
-        static const std::vector<std::string> dangerKeywords = {
+        static constexpr std::array<std::string_view, 3> dangerKeywords = {
             "end_crystal", "flint_and_steel", "fire_charge"
         };
         const auto item_id = event.getItem()->getType().getId().getKey();
-        auto containsKeyword = [&item_id](const std::string& kw) {
+
+        auto containsKeyword = [&item_id](const std::string_view kw) {
             return item_id.find(kw) != std::string::npos;
         };
 

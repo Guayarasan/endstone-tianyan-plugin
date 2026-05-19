@@ -3,7 +3,6 @@
 //
 
 #include "../include/tianyan_core.h"
-#include <ctime>
 #include <stdexcept>
 
 TianyanCore::TianyanCore(IDatabaseBackend& db) : db_backend_(db) {};

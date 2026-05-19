@@ -677,10 +677,9 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                 return false;
             }
             try {
-                const double time = stod(args[0]);
-
                 // 提交后台查询任务
                 {
+                    const double time = stod(args[0]);
                     const string search_key_type = args.size() > 1 ? args[1] : "";
                     const string search_key = args.size() > 2 ? args[2] : "";
                     uint64_t task_id;

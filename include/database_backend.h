@@ -43,13 +43,25 @@ public:
 
     virtual int searchLog(std::vector<std::map<std::string, std::string>>& result,
                           const std::pair<std::string, double>& key,
-                          std::atomic<bool>* cancel = nullptr) = 0;
+                          std::atomic<bool>* cancel) = 0;
+
+    int searchLog(std::vector<std::map<std::string, std::string>>& result,
+                  const std::pair<std::string, double>& key) {
+        return searchLog(result, key, nullptr);
+    }
 
     virtual int searchLog(std::vector<std::map<std::string, std::string>>& result,
                           const std::pair<std::string, double>& key,
                           double x, double y, double z, double r,
                           const std::string& world,
-                          std::atomic<bool>* cancel = nullptr) = 0;
+                          std::atomic<bool>* cancel) = 0;
+
+    int searchLog(std::vector<std::map<std::string, std::string>>& result,
+                  const std::pair<std::string, double>& key,
+                  double x, double y, double z, double r,
+                  const std::string& world) {
+        return searchLog(result, key, x, y, z, r, world, nullptr);
+    }
 
     virtual bool updateStatusesByUUIDs(
         const std::vector<std::pair<std::string, std::string>>& pairs) = 0;

@@ -7,7 +7,6 @@
 #include <string>
 #include <fstream>
 #include <mutex>
-#include <unordered_set>
 #include "database_backend.h"
 #include "tianyan_protect.h"
 #include "event_listener.h"
@@ -22,9 +21,6 @@ public:
 };
 
 class TianyanPlugin : public endstone::Plugin, public tianyan::ITianyanAPI{
-protected:
-    // 实现受保护的底层查询
-    std::vector<tianyan::LogData> getLogDataSyncImpl(double seconds, int limit) override;
 public:
     //语言
     static inline std::unique_ptr<translate> Tran;
@@ -67,6 +63,7 @@ public:
     [[nodiscard]] std::vector<tianyan::LogData> getLogDataSync(double hours, int limit) const;
 
 private:
+    std::vector<tianyan::LogData> getLogDataSyncImpl(double seconds, int limit) override;
     struct AsyncQueryTask {
         enum class Type { Ty, Tys, Tyback };
         Type type;

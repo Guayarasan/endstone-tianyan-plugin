@@ -5,7 +5,6 @@
 // ReSharper disable CppMemberFunctionMayBeConst
 #ifndef TIANYAN_EVENTLISTENER_H
 #define TIANYAN_EVENTLISTENER_H
-#include "global.h"
 #include <endstone/endstone.hpp>
 
 #include "translate.hpp"

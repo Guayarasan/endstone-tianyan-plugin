@@ -31,13 +31,13 @@ public:
 
     int searchLog(std::vector<std::map<std::string, std::string>>& result,
                   const std::pair<std::string, double>& key,
-                  std::atomic<bool>* cancel = nullptr) override;
+                  std::atomic<bool>* cancel) override;
 
     int searchLog(std::vector<std::map<std::string, std::string>>& result,
                   const std::pair<std::string, double>& key,
                   double x, double y, double z, double r,
                   const std::string& world,
-                  std::atomic<bool>* cancel = nullptr) override;
+                  std::atomic<bool>* cancel) override;
 
     bool updateStatusesByUUIDs(
         const std::vector<std::pair<std::string, std::string>>& pairs) override;

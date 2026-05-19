@@ -7,6 +7,8 @@
 #include <fmt/format.h>
 #include <string>
 
+using namespace nlohmann;
+
 class translate {
 public:
     translate() = default;
