@@ -123,14 +123,14 @@ Example: To change to English, modify the `language` item to `"en_US"`.
 ```
 /ty <radius> <time (unit: hours)>
 ```
-Without parameters, a quick menu will pop up where players can query. The maximum searchable radius is 100 (blocks), and the maximum searchable time is 672 (hours). (When query data exceeds 25,000 entries, the query will be truncated and only 25,000 data entries will be displayed)
+Without parameters, a quick menu will pop up where players can query. The maximum searchable radius is 100 (blocks), and the maximum searchable time is 672 (hours).
 
 ### `/tys` - Search keywords (cannot be used from console)
 ```
 /tys <time (unit: hours)> [search object type] [search object keyword]
 ```
 
-Without parameters, a quick menu will pop up where players can query. Maximum searchable radius and time are unlimited. (When query data exceeds 25,000 entries, the query will be truncated and only 25,000 data entries will be displayed)
+Without parameters, a quick menu will pop up where players can query. Maximum searchable radius and time are unlimited.
 
 Search object types:
 - `source_id`: Behavior source ID
@@ -207,7 +207,7 @@ This command can find areas with the highest entity density in the server and su
 ```
 
 This command can restore partial behaviors of players or entities. Including: player direct block destruction and placement, block destruction caused by entity explosions, entity deaths, and block changes caused by player interactions. Entity deaths will not restore attributes such as fur color and age; water-containing blocks created by players cannot be restored to their original state. The principle is to use setblock and summon commands to restore from the log database.
-Without parameters, a quick menu will pop up where players can query. The maximum restorable radius is 100 (blocks), and time is unlimited. (When query data exceeds 25,000 entries, the query will be truncated and only 25,000 data entries will be restored. The actual restorable radius is affected by chunks, and restoration will not be possible if beyond the limit distance of setblock and summon commands, requiring you to get closer and try again)
+Without parameters, a quick menu will pop up where players can query. The maximum restorable radius is 100 (blocks), and time is unlimited. The actual restorable radius is affected by chunks, and restoration will not be possible if beyond the limit distance of setblock and summon commands, requiring you to get closer and try again)
 
 ## 🔧 Modification & Building
 
