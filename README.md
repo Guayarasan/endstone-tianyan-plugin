@@ -1,95 +1,97 @@
-![header](https://capsule-render.vercel.app/api?type=waving&height=300&color=gradient&text=Tianyan%20Plugin&animation=fadeIn&textBg=false&descAlignY=78&desc=Behavior%20logging%20for%20Endstone&section=footer&reversal=true)
+![header](https://capsule-render.vercel.app/api?type=waving&height=300&color=gradient&text=Tianyan%20Protect&animation=fadeIn&textBg=false&descAlignY=78&desc=Lightweight%2C%20Fast%2C%20and%20Secure&section=footer&reversal=true)
 
 
-# 天眼插件 
+# Tianyan Protect Plugin
 
-[![English](https://img.shields.io/badge/English-README_eng.md-blue)](README_eng.md)
+[![中文](https://img.shields.io/badge/中文-README_chs.md-blue)](README_chs.md) 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 ![Build Status](https://github.com/yuhangle/endstone-tianyan-plugin/actions/workflows/workflow.yml/badge.svg)
 
-一款适用于 [Endstone](https://github.com/EndstoneMC/endstone) 插件加载器的玩家行为记录查询插件。
+Tianyan Protect Plugin is a log data recording and anti-malicious behavior plugin for the [Endstone](https://github.com/EndstoneMC/endstone) plugin loader, supporting a degree of rollback operations. Out-of-the-box, simple and efficient. Plays a role in security protection on Endstone servers.
 
-## 📋 功能介绍
+## 📋 Feature Introduction
 
-### 🔍 行为记录
+### 🔍 Behavior Logging
 
-天眼插件使用 Endstone 的事件 API 进行行为事件的记录，可以对以下行为事件进行记录：
+The Tianyan plugin uses Endstone's event API to log behavioral events, and can record the following behavioral events:
 
-#### 玩家对方块和实体交互行为事件
-玩家对方块和部分实体进行的交互事件均会被记录。
+#### Player Interaction Events with Blocks and Entities
+Interaction events between players and blocks or certain entities will be recorded.
 
-#### 玩家直接破坏方块和实体爆炸破坏方块行为事件
-玩家直接破坏方块和实体爆炸破坏方块行为事件均会被记录。玩家间接破坏方块，如踩坏耕地等，无法触发事件；非玩家实体对方块的操作不会触发事件，除非自己爆炸。
+#### Player Direct Block Breaking and Entity Explosion Block Destruction Events
+Both players direct block breaking and entity explosion block destruction events will be recorded. Indirect block breaking by players, such as trampling farmland, cannot trigger events; operations on blocks by non-player entities will not trigger events unless they explode themselves.
 
-#### 实体受到伤害事件
-除了配置文件中被排除的实体，所有实体受到伤害时均会被记录。部分特殊实体，比如画被攻击是直接被移除，无法触发伤害事件。
+#### Entity Damage Events
+Except for entities excluded in the configuration file, all entity damage events will be recorded. Some special entities, such as paintings that are directly removed when attacked, cannot trigger damage events.
 
-#### 玩家放置方块行为事件
-插件将对全部玩家直接实行的方块放置行为事件进行记录。
+#### Player Block Placement Events
+The plugin will record all direct block placement behaviors implemented by players.
 
-#### 活塞行为事件
-所有活塞自身行为会被记录，但是被推动的方块无法记录。
+#### Piston Events
+All piston self-behaviors will be recorded, but the blocks being pushed cannot be recorded.
 
-### 👤 玩家信息显示和封禁功能
+### 👤 Player Information Display and Ban Functions
 
-#### 玩家加服信息显示
-天眼插件支持玩家加服信息显示功能。当玩家加入服务器时，将显示玩家的系统名称和设备ID。
+#### Player Join Information Display
+The Tianyan plugin supports displaying player join information. When a player joins the server, the player's system name and device ID will be displayed.
 
-#### 封禁功能 & 防刷屏功能
-插件可以通过封禁设备ID将使用此设备ID的设备拉入封禁名单，使得使用该设备（设备ID不变）的任何玩家都无法进入服务器。使用过封禁设备的玩家，若更换设备，会自动追加新设备到封禁名单中。
+#### Ban Function & Anti-Spam Function
+The plugin can ban devices by banning device IDs, adding devices using these device IDs to the ban list, preventing any player using that device (unchanged device ID) from entering the server. Players who have used banned devices will automatically have their new devices added to the ban list if they switch devices.
 
-自动封禁规则：
-- 当玩家在服务器内短时间发送大量消息（10秒内6条消息）时，将被自动封禁24小时
-- 当玩家在服务器内短时间发送大量命令（10秒内12条命令）时将被自动封禁24小时
+Automatic ban rules:
+- When players send a large number of messages in a short time (6 messages within 10 seconds) in the server, they will be automatically banned for 24 hours
+- When players send a large number of commands in a short time (12 commands within 10 seconds) in the server, they will be automatically banned for 24 hours
 
-### 🛠️ 其它功能
+### 🛠️ Other Features
 
-#### 复原玩家直接造成的方块破坏与方块放置以及实体爆炸造成的破坏的功能
-天眼插件支持复原玩家直接造成的方块破坏与方块放置以及实体爆炸造成的破坏，其原理是简单的使用了 setblock 命令从数据库中还原了方块，暂不支持还原箱子内容物之类的细节。
+#### Restore Player-Caused Block Destruction, Placement, and Explosion Damage Functions
+The Tianyan plugin supports restoring player-directly caused block destruction, block placement, and explosion damage. The principle is simply using the setblock command to restore blocks from the database, but it does not currently support restoring details such as chest contents.
 
-#### 查看在线玩家物品栏功能
-天眼插件支持查看在线玩家的物品栏内的物品信息。
+#### View Online Player Inventory Function
+The Tianyan plugin supports viewing item information in online players' inventories.
 
-### 🌐 WebUI面板
-天眼插件提供了 WebUI 面板，可以在浏览器中访问面板，查看行为记录。 启用WebUI功能需要在配置文件中修改"enable_web_ui"为true。
-WebUI被启动后，会在插件数据目录下生成WebUI配置文件web_config.json:
+#### 🌐 WebUI Panel
+
+The Tianyan plugin provides a WebUI panel that can be accessed through a browser to view behavior records. To enable the WebUI feature, set "enable_web_ui" to true in the configuration file.
+
+After the WebUI is started, a WebUI configuration file web_config.json will be generated in the plugin data directory:
 ```json
 {
-    "secret": "your_secret",
-    "backend_port": 8098
+"secret": "your_secret",
+"backend_port": 8098
 }
 ```
-- `secret`: WebUI 访问密钥，用于验证身份
-- `backend_port`: WebUI 端口
+- `secret`: Access key for the WebUI, used for authentication
 
-运行WebUI需要以下pip包：`fastapi` `uvicorn`,WebUI在运行时会自动安装pip包。
+- `backend_port`: WebUI port
 
-你可以通过`服务器IP:WebUI端口`访问WebUI面板,例如，默认端口为8098，访问地址为`http://127.0.0.1:8098`。
+Running the WebUI requires the following pip packages: `fastapi`, `uvicorn`. These packages will be automatically installed when the WebUI runs.
 
-你也可以在WebUI指定连接后端IP和端口。
+You can access the WebUI panel via `server_IP:WebUI_port`. For example, with the default port 8098, the access URL is `http://127.0.0.1:8098`.
 
-## 🚀 安装 & 配置 & 使用方法
+You can also specify the backend IP and port within the WebUI after connecting.
 
-### 安装 Endstone
-这一步请参考 [Endstone 官方文档](https://github.com/EndstoneMC/endstone)。
+## 🚀 Installation, Configuration & Usage
 
-### 安装天眼插件
-1. 在 Release 页面下载最新版本的插件
-2. 解压出插件文件与数据文件夹
-3. 放在服务端目录的 `plugins` 目录下
-4. 运行服务器即可使用
+### Install Endstone
+Please refer to the [Endstone official documentation](https://github.com/EndstoneMC/endstone) for this step.
 
-### 配置天眼插件
+### Install Tianyan Plugin
+1. Download the latest version of the plugin from the Releases page
+2. Extract the plugin files and data folder
+3. Place them in the `plugins` directory of the server directory
+4. Run the server to use it
 
-运行天眼插件后，将自动在服务端目录的 `plugins` 目录下生成 `tianyan_data` 文件夹，并自动生成 `config.json` 文件。语言文件不会自动生成，请从github仓库下载。
+### Configure Tianyan Plugin
 
-默认配置如下：
+After running the Tianyan plugin, the `tianyan_data` folder will be automatically generated in the `plugins` directory of the server directory, and the `config.json` file will be automatically generated. Language files will not be automatically generated, please download them from the GitHub repository.
+
+Default configuration:
 
 ```json
 {
     "10s_command_max": 12,
     "10s_message_max": 6,
-    "database_type": "sqlite",
     "enable_web_ui": false,
     "language": "zh_CN",
     "no_log_mobs": [
@@ -102,151 +104,133 @@ WebUI被启动后，会在插件数据目录下生成WebUI配置文件web_config
 }
 ```
 
-配置项说明：
-- `10s_command_max`: 10秒内玩家可使用命令的最大次数
-- `10s_message_max`: 10秒内玩家可发送消息的最大次数
-- `database_type`: 数据库类型，可选 `sqlite`（默认）或 `mysql`
-- `enable_web_ui`: 是否启用 WebUI
-- `language`: 插件语言
-- `no_log_mobs`: 不被记录的实体列表
+Configuration item descriptions:
+- `10s_command_max`: Maximum number of commands players can use within 10 seconds
+- `10s_message_max`: Maximum number of messages players can send within 10 seconds
+- `enable_web_ui`: Enable WebUI
+- `language`: Plugin language
+- `no_log_mobs`: List of entities not to be logged
 
-> 在涉及实体事件中，除非使用命名牌，否则不会记录 `no_log_mobs` 中的实体。
+> In entity-related events, entities in `no_log_mobs` will not be recorded unless the entity has been named.
 
-插件配置默认使用中文，可以通过修改 `config.json` 中的 `language` 项更改语言。支持的语言可在 [language](language/zh_CN.json) 文件夹查看。
+The plugin configuration defaults to Chinese, and the language can be changed by modifying the `language` item in `config.json`. Supported languages can be viewed in the [language](language/zh_CN.json) folder.
 
-示例：要修改为英文时，修改 `language` 项为 `"en_US"`。
+Example: To change to English, modify the `language` item to `"en_US"`.
 
-### MySQL 数据库支持
+## 📜 Plugin Command Usage
 
-天眼插件支持使用 MySQL 作为日志存储后端，依赖 [endstone-mysql-api](https://github.com/yuhangle/endstone-mysql-api) 插件提供的 Service 接口与 MySQL 交互。
+### `/ty` - Query player and some entity behavior logs (cannot be used from console, regular members can use this command)
+```
+/ty <radius> <time (unit: hours)>
+```
+Without parameters, a quick menu will pop up where players can query. The maximum searchable radius is 100 (blocks), and the maximum searchable time is 672 (hours). (When query data exceeds 25,000 entries, the query will be truncated and only 25,000 data entries will be displayed)
 
-使用 MySQL 前，请确保已安装 `endstone-mysql-api` 插件并正确配置了 MySQL 连接（参考其文档）。然后修改天眼插件配置 `plugins/tianyan_data/config.json`：
-
-```json
-{
-    "database_type": "mysql"
-}
+### `/tys` - Search keywords (cannot be used from console)
+```
+/tys <time (unit: hours)> [search object type] [search object keyword]
 ```
 
-注意：
-- 若 `database_type` 设置为 `mysql` 但 `endstone-mysql-api` 插件未加载或连接失败，天眼插件将自动回退使用 SQLite
-- 切换数据库类型不会自动迁移已有数据，请手动备份或自行迁移
+Without parameters, a quick menu will pop up where players can query. Maximum searchable radius and time are unlimited. (When query data exceeds 25,000 entries, the query will be truncated and only 25,000 data entries will be displayed)
 
-## 📜 插件命令使用方法
+Search object types:
+- `source_id`: Behavior source ID
+- `source_name`: Behavior source name
+- `target_id`: Behavior target ID
+- `target_name`: Behavior target name
 
-### `/ty` - 查询玩家及部分实体行为记录(控制台不可使用此命令,普通成员可使用此命令)
-```
-/ty <半径> <时间（单位：小时）>
-```
-无参数则将弹出快捷菜单，玩家可在菜单中查询。最大可查询半径为100(格),最大可查询时间为672(小时)。(查询数据超过25000条时，将截断查询，只显示25000条数据)
-
-### `/tys` - 搜索关键词(控制台不可使用此命令)
-```
-/tys <时间（单位：小时）> [搜索对象类型] [搜索对象关键词]
-```
-
-无参数则将弹出快捷菜单，玩家可在菜单中查询。最大可查询半径和时间无限。(查询数据超过25000条时，将截断查询，只显示25000条数据)
-
-搜索对象类型：
-- `source_id`: 行为源ID
-- `source_name`: 行为源名称
-- `target_id`: 行为目标ID
-- `target_name`: 行为目标名称
-
-示例：搜索2小时内名为"ZhangSan"的玩家实施的行为
+Example: Search for behaviors implemented by a player named "ZhangSan" within 2 hours
 ```
 /tys 2 source_name "ZhangSan"
 ```
 
-搜索特定行为类型：
+Search specific behavior types:
 ```
-/tys <时间（单位：小时）> <action> <搜索行为类型>
+/tys <time (unit: hours)> <action> <search behavior type>
 ```
 
-搜索行为类型：
-- `block_break`: 方块破坏
-- `block_place`: 方块放置
-- `entity_damage`: 实体伤害
-- `player_right_click_block`: 玩家右键方块
-- `player_right_click_entity`: 玩家右键实体
-- `entity_bomb`: 实体爆炸
-- `block_break_bomb`: 方块爆炸
-- `piston_extend`: 活塞弹出
-- `piston_retract`: 活塞收回
-- `entity_die`: 实体死亡
-- `player_pickup_item`: 玩家拾取物品
-- `player_drop_item`: 玩家丢弃物品
+Search behavior types:
+- `block_break`: Block breaking
+- `block_place`: Block placement
+- `entity_damage`: Entity damage
+- `player_right_click_block`: Player right-clicking block
+- `player_right_click_entity`: Player right-clicking entity
+- `entity_bomb`: Entity explosion
+- `block_break_bomb`: Block explosion
+- `piston_extend`: Piston extending
+- `piston_retract`: Piston retracting
+- `entity_die`: Entity death
+- `player_pickup_item`: Player picking up item
+- `player_drop_item`: Player dropping item
 
-示例：搜索2小时内的玩家方块放置行为
+Example: Search for player block placement behaviors within 2 hours
 ```
 /tys 2 action block_place
 ```
 
-### `/tyo` - 查看在线玩家物品栏(控制台不可使用此命令)
+### `/tyo` - View online player inventory (cannot be used from console)
 ```
-/tyo 玩家名
-```
-
-### `/ban-id` - 将设备加入黑名单
-```
-/ban-id <设备ID> [理由]
+/tyo <player name>
 ```
 
-### `/unban-id` - 将设备移出黑名单
+### `/ban-id` - Add device to blacklist
 ```
-/unban-id <设备ID>
+/ban-id <device ID> [reason]
 ```
 
-### `/banlist-id` - 列出所有被封禁的设备ID
+### `/unban-id` - Remove device from blacklist
+```
+/unban-id <device ID>
+```
+
+### `/banlist-id` - List all banned device IDs
 ```
 /banlist-id
 ```
 
-### `/tyclean` - 清理数据库
+### `/tyclean` - Clean database
 ```
-/tyclean <时间(单位:小时)>
-```
-
-此命令可清理数据库中超过指定时间的日志。
-
-### `/density` - 检测实体密度最高的区域
-```
-/density [区域大小(单位:格)]
+/tyclean <time (unit: hours)>
 ```
 
-此命令可以在服务器内查找实体密度最高的区域，并支持传送到该区域。区域大小代表单个搜索区域(正方体)的边长。
+This command can clean logs in the database that exceed the specified time.
 
-### `/tyback` - 还原玩家或实体部分行为(实验性;控制台不可使用此命令)
+### `/density` - Detect areas with the highest entity density
 ```
-/tyback <半径> <时间（单位：小时）> <行为类型> <关键词>
+/density [area size (unit: blocks)]
 ```
 
-此命令能够恢复玩家或实体部分行为。包括：玩家对方块的直接破坏与放置、实体爆炸产生的方块破坏、实体的死亡、玩家交互造成方块的变化。其中实体死亡不会还原毛色、年龄等属性；玩家制造的含水方块无法被还原为原始状态。其原理为使用setblock和summon命令从日志数据库中还原。
-无参数则将弹出快捷菜单，玩家可在菜单中查询。最大可恢复半径为100(格),时间无限。(查询数据超过25000条时，将截断查询，只恢复25000条数据。实际可恢复半径受区块影响，超出setblock命令和summon命令的极限距离将无法恢复，需要靠近再来一次)
+This command can find areas with the highest entity density in the server and support teleporting to that area. Area size represents the edge length of a single search area (cube).
 
-## 🔧 修改 & 构建
+### `/tyback` - Restore player or entity partial behaviors (experimental; cannot be used from console)
+```
+/tyback <radius> <time (unit: hours)> <behavior type> <keyword>
+```
 
-### 云构建
-1. Fork 项目
-2. 在自己 fork 的分支中，使用 Action 运行构建
-3. 几分钟后即可看到构建结果
-4. Release 需要在自己的 Action 中配置一个名为 `RELEASE_TOKEN` 的密钥
+This command can restore partial behaviors of players or entities. Including: player direct block destruction and placement, block destruction caused by entity explosions, entity deaths, and block changes caused by player interactions. Entity deaths will not restore attributes such as fur color and age; water-containing blocks created by players cannot be restored to their original state. The principle is to use setblock and summon commands to restore from the log database.
+Without parameters, a quick menu will pop up where players can query. The maximum restorable radius is 100 (blocks), and time is unlimited. (When query data exceeds 25,000 entries, the query will be truncated and only 25,000 data entries will be restored. The actual restorable radius is affected by chunks, and restoration will not be possible if beyond the limit distance of setblock and summon commands, requiring you to get closer and try again)
 
-### 本地构建
+## 🔧 Modification & Building
 
-按照 Endstone 文档配置好开发环境：
+### Cloud Building
+1. Fork the project
+2. In your forked branch, run builds using Actions
+3. Build results can be seen after a few minutes
 
-- Linux 需要安装 sqlite3 开发库
-- Windows 需要使用 vcpkg 或其它包管理工具 安装 sqlite3 静态开发库
+### Local Building
 
-克隆项目代码：
+Configure the development environment according to Endstone documentation:
+
+- Linux needs to install sqlite3 development library
+- Windows needs to use vcpkg or other package managers to install sqlite3 static development library
+
+Clone the project code:
 ```shell
 git clone https://github.com/yuhangle/endstone-tianyan-plugin.git
 ```
 
-使用你喜欢的开发工具打开代码目录，以 CLion 为例，在构建中点击构建项目，即可构建插件。
+Open the code directory with your preferred development tool. Taking CLion as an example, click build project in the build to build the plugin.
 
-其中，如果使用 vcpkg ，Windows需要为 CMake 配置以下参数：
+When using vcpkg, Windows needs to configure the following parameters for CMake:
 
 ```
 -DCMAKE_TOOLCHAIN_FILE="{Your vcpkg path}\scripts\buildsystems\vcpkg.cmake" \
