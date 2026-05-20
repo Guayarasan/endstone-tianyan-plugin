@@ -412,13 +412,73 @@ void Menu::showOnlinePlayerBag(const endstone::CommandSender &sender, const ends
             sender.sendMessage(fmt::format("{}{}", endstone::ColorFormat::Red, tran_->getLocal("This player's inventory is empty")));
         } else {
             endstone::ActionForm form;
-            form.setTitle(player.getName());
+            form.setTitle(tran_->tr("{0}'s Inventory", player.getName()));
             form.setContent(output_item);
             sender.asPlayer()->sendForm(form);
         }
     } catch (...) {
         sender.sendMessage(fmt::format("{}{}", endstone::ColorFormat::Red, tran_->getLocal("Unknow Error")));
     }
+}
+
+void Menu::setInventoryUIService(std::shared_ptr<inventoryui::InventoryUI> service) {
+    inventory_ui_service_ = std::move(service);
+}
+
+//可视化物品栏展示（使用 inventoryui）
+bool Menu::showPlayerInventoryUI(endstone::Player &sender, endstone::Player &target) {
+    if (!inventory_ui_service_) {
+        if (const auto* inv_ui_plugin = plugin_.getServer().getPluginManager().getPlugin("inventoryui"); inv_ui_plugin && inv_ui_plugin->isEnabled()) {
+            inventory_ui_service_ = plugin_.getServer().getServiceManager().load<inventoryui::InventoryUI>("InventoryUI");
+        }
+        if (!inventory_ui_service_) return false;
+    }
+
+    // 如果玩家已有打开的菜单，直接刷新物品
+    if (last_inventory_menu_) {
+        for (auto viewers = last_inventory_menu_->get_viewers(); auto& viewer : viewers) {
+            if (viewer->getName() == sender.getName()) {
+                auto inv = last_inventory_menu_->get_inventory();
+                inv->clear();
+                auto contents = target.getInventory().getContents();
+                for (int i = 0; i < 36 && i < static_cast<int>(contents.size()); i++) {
+                    if (contents[i]) inv->set_item(i, *contents[i]);
+                }
+                if (auto helmet = target.getInventory().getHelmet()) inv->set_item(45, *helmet);
+                if (auto chestplate = target.getInventory().getChestplate()) inv->set_item(46, *chestplate);
+                if (auto leggings = target.getInventory().getLeggings()) inv->set_item(47, *leggings);
+                if (auto boots = target.getInventory().getBoots()) inv->set_item(48, *boots);
+                if (auto offhand = target.getInventory().getItemInOffHand()) inv->set_item(49, *offhand);
+                return true;
+            }
+        }
+        last_inventory_menu_->close_all();
+    }
+
+    // 没有现成的菜单，创建新的
+    auto menu = inventory_ui_service_->create_menu(
+        inventoryui::MenuTypeId::DOUBLE_CHEST,
+        tran_->tr("{0}'s Inventory", target.getName())
+    );
+    last_inventory_menu_ = menu;
+    auto inv = menu->get_inventory();
+
+    auto contents = target.getInventory().getContents();
+    for (int i = 0; i < 36 && i < static_cast<int>(contents.size()); i++) {
+        if (contents[i]) inv->set_item(i, *contents[i]);
+    }
+
+    if (auto helmet = target.getInventory().getHelmet()) inv->set_item(45, *helmet);
+    if (auto chestplate = target.getInventory().getChestplate()) inv->set_item(46, *chestplate);
+    if (auto leggings = target.getInventory().getLeggings()) inv->set_item(47, *leggings);
+    if (auto boots = target.getInventory().getBoots()) inv->set_item(48, *boots);
+
+    if (auto offhand = target.getInventory().getItemInOffHand()) {
+        inv->set_item(49, *offhand);
+    }
+
+    menu->send_to(sender);
+    return true;
 }
 
 //查找实体密度高区域

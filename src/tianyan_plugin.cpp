@@ -496,6 +496,17 @@ _____   _
         windows_print_webui_log = getServer().getScheduler().runTaskTimer(*this, [&]() {dump_webui_log_once();},0,20);
 #endif
     }
+    // 尝试加载 inventoryui 服务（用于可视化物品栏展示，非必需）
+    {
+        std::shared_ptr<inventoryui::InventoryUI> inv_ui_service;
+        if (const auto* inv_ui_plugin = getServer().getPluginManager().getPlugin("inventoryui"); inv_ui_plugin && inv_ui_plugin->isEnabled()) {
+            inv_ui_service = getServer().getServiceManager().load<inventoryui::InventoryUI>("InventoryUI");
+            if (inv_ui_service) {
+                getLogger().info("InventoryUI service loaded for visual inventory display");
+            }
+        }
+        menu_->setInventoryUIService(std::move(inv_ui_service));
+    }
     //注册api
     const auto api_ptr = std::shared_ptr<ITianyanAPI>(this, [](ITianyanAPI*){
     });
@@ -820,7 +831,9 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
         if (!args.empty()) {
             const string& player_name = args[0];
             if (auto player = getServer().getPlayer(player_name)) {
-                menu_->showOnlinePlayerBag(sender, *player);
+                if (!menu_->showPlayerInventoryUI(*sender.asPlayer(), *player)) {
+                    menu_->showOnlinePlayerBag(sender, *player);
+                }
             } else {
                 sender.sendErrorMessage(Tran->tr(Tran->getLocal("Player {} not found"), player_name));
             }

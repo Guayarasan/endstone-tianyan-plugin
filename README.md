@@ -48,7 +48,7 @@ Automatic ban rules:
 The Tianyan plugin supports restoring player-directly caused block destruction, block placement, and explosion damage. The principle is simply using the setblock command to restore blocks from the database, but it does not currently support restoring details such as chest contents.
 
 #### View Online Player Inventory Function
-The Tianyan plugin supports viewing item information in online players' inventories.
+The Tianyan plugin supports viewing item information in online players' inventories. By default, it displays items in a text form. If the optional [endstone-inventoryui](https://github.com/yuhangle/endstone-inventoryui) plugin is installed, `/tyo` will show the inventory in a visual chest GUI with enchantment glints and custom names rendered correctly.
 
 #### 🌐 WebUI Panel
 
@@ -92,6 +92,7 @@ Default configuration:
 {
     "10s_command_max": 12,
     "10s_message_max": 6,
+    "database_type": "sqlite",
     "enable_web_ui": false,
     "language": "zh_CN",
     "no_log_mobs": [
@@ -107,6 +108,7 @@ Default configuration:
 Configuration item descriptions:
 - `10s_command_max`: Maximum number of commands players can use within 10 seconds
 - `10s_message_max`: Maximum number of messages players can send within 10 seconds
+- `database_type`: Database type, `sqlite` (default) or `mysql`
 - `enable_web_ui`: Enable WebUI
 - `language`: Plugin language
 - `no_log_mobs`: List of entities not to be logged
@@ -116,6 +118,22 @@ Configuration item descriptions:
 The plugin configuration defaults to Chinese, and the language can be changed by modifying the `language` item in `config.json`. Supported languages can be viewed in the [language](language/zh_CN.json) folder.
 
 Example: To change to English, modify the `language` item to `"en_US"`.
+
+### MySQL Database Support
+
+The Tianyan plugin supports using MySQL as the log storage backend, relying on the Service interface provided by the [endstone-mysql-api](https://github.com/yuhangle/endstone-mysql-api) plugin.
+
+Before using MySQL, make sure the `endstone-mysql-api` plugin is installed and MySQL connection is properly configured (refer to its documentation). Then modify the Tianyan plugin config at `plugins/tianyan_data/config.json`:
+
+```json
+{
+    "database_type": "mysql"
+}
+```
+
+Notes:
+- If `database_type` is set to `mysql` but the `endstone-mysql-api` plugin is not loaded or the connection fails, the Tianyan plugin will automatically fall back to SQLite
+- Switching database types will not automatically migrate existing data; please back up manually or migrate on your own
 
 ## 📜 Plugin Command Usage
 
@@ -171,6 +189,7 @@ Example: Search for player block placement behaviors within 2 hours
 ```
 /tyo <player name>
 ```
+Displays in a text form by default. If the optional [endstone-inventoryui](https://github.com/yuhangle/endstone-inventoryui) plugin is installed, opens a visual chest GUI instead. Note: item tooltips on hover are limited by the client and won't show enchantment details.
 
 ### `/ban-id` - Add device to blacklist
 ```

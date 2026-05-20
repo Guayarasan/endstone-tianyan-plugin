@@ -34,10 +34,15 @@ FetchContent_Declare(
     GIT_TAG main
 )
 
-# FetchContent doesn't add_subdirectory automatically for single-project repos;
-# we must do so explicitly so the INTERFACE target is available.
-# endstone-mysql-api 是一个 header-only 接口库
 FetchContent_MakeAvailable(endstone_mysql_api)
+
+# endstone-inventoryui (header-only interface for visual inventory UI)
+FetchContent_Declare(
+    endstone_inventoryui
+    GIT_REPOSITORY https://github.com/yuhangle/endstone-inventoryui.git
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(endstone_inventoryui)
 
 # SQLite3
 find_package(SQLite3 REQUIRED)
@@ -66,6 +71,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         SQLite::SQLite3
         fmt::fmt-header-only
         endstone_mysql_api
+        endstone_inventoryui
 )
 
 find_package(Git QUIET)

@@ -122,5 +122,6 @@
   "Too many logs. Loading in the background to avoid lag — please wait": "Слишком много журналов. Загрузка в фоновом режиме для предотвращения лага — пожалуйста, подождите",
   "A background operation is in progress. Please wait for it to complete": "Фоновая операция выполняется. Пожалуйста, подождите завершения",
   "Searching in the background, please wait": "Поиск в фоновом режиме, пожалуйста, подождите",
-  "Previous query cancelled, starting a new one": "Предыдущий запрос отменён, начинается новый"
+  "Previous query cancelled, starting a new one": "Предыдущий запрос отменён, начинается новый",
+  "{0}'s Inventory": "Инвентарь {0}"
 }
