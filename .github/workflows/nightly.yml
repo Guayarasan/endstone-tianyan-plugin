@@ -86,12 +86,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p package/tianyan_data/language
-          SO_FILE=$(find build -name "*.so" | head -n 1)
-          if [ -z "$SO_FILE" ]; then
-            echo "No .so file found!"
+          if [ ! -f "build/endstone_tianyan.so" ]; then
+            echo "No endstone_tianyan.so found!"
             exit 1
           fi
-          cp "$SO_FILE" package/endstone_tianyan.so
+          cp build/endstone_tianyan.so package/endstone_tianyan.so
           cp -r language/* package/tianyan_data/language/
           cp -r WebUI package/tianyan_data/
           cd package

@@ -109,13 +109,9 @@ jobs:
       - name: Prepare plugin artifact (Linux)
         if: runner.os == 'Linux'
         run: |
-          SO_FILE=$(find build -name "*.so" | head -n 1)
-          if [ -z "$SO_FILE" ]; then
-            echo "No .so file found!"
+          if [ ! -f "build/endstone_tianyan.so" ]; then
+            echo "No endstone_tianyan.so found!"
             exit 1
-          fi
-          if [ "$SO_FILE" != "build/endstone_tianyan.so" ]; then
-            cp "$SO_FILE" build/endstone_tianyan.so
           fi
 
       # ===== Upload plugin artifact =====
