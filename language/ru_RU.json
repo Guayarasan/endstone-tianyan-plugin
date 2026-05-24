@@ -123,5 +123,8 @@
   "A background operation is in progress. Please wait for it to complete": "Фоновая операция выполняется. Пожалуйста, подождите завершения",
   "Searching in the background, please wait": "Поиск в фоновом режиме, пожалуйста, подождите",
   "Previous query cancelled, starting a new one": "Предыдущий запрос отменён, начинается новый",
-  "{0}'s Inventory": "Инвентарь {0}"
+  "{0}'s Inventory": "Инвентарь {0}",
+  "Using Rust MySQL database backend": "Используется Rust MySQL бэкенд",
+  "MySQL database table initialization failed!": "Ошибка инициализации таблицы MySQL!",
+  "Failed to connect to MySQL, falling back to SQLite database": "Не удалось подключиться к MySQL, используется SQLite"
 }

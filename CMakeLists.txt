@@ -13,6 +13,7 @@ endif()
 
 
 include(FetchContent)
+include(ExternalProject)
 FetchContent_Declare(
         endstone
         GIT_REPOSITORY https://github.com/EndstoneMC/endstone.git
@@ -26,15 +27,6 @@ FetchContent_Declare(
         GIT_TAG v3.12.0
 )
 FetchContent_MakeAvailable(nlohmann_json)
-
-# endstone-mysql-api (header-only interface for MySQL backend)
-FetchContent_Declare(
-    endstone_mysql_api
-    GIT_REPOSITORY https://github.com/yuhangle/endstone-mysql-api.git
-    GIT_TAG main
-)
-
-FetchContent_MakeAvailable(endstone_mysql_api)
 
 # fmt (header-only or static)
 FetchContent_Declare(
@@ -52,6 +44,34 @@ FetchContent_Declare(
     GIT_TAG main
 )
 FetchContent_MakeAvailable(endstone_inventoryui)
+
+# ---- Rust MySQL static library (built via cargo) ----
+if (WIN32)
+    set(RUST_MYSQL_LIB_NAME "rust_mysql.lib")
+    set(RUST_MYSQL_SYSTEM_LIBS ws2_32 ntdll userenv)
+else()
+    set(RUST_MYSQL_LIB_NAME "librust_mysql.a")
+    set(RUST_MYSQL_SYSTEM_LIBS dl pthread rt m)
+endif()
+
+set(RUST_MYSQL_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/rust_mysql")
+set(RUST_MYSQL_LIB_PATH "${RUST_MYSQL_SRC_DIR}/target/release/${RUST_MYSQL_LIB_NAME}")
+
+ExternalProject_Add(rust_mysql_build
+    SOURCE_DIR "${RUST_MYSQL_SRC_DIR}"
+    BUILD_IN_SOURCE TRUE
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND cargo build --release
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS "${RUST_MYSQL_LIB_PATH}"
+    USES_TERMINAL_BUILD TRUE
+)
+
+add_library(rust_mysql STATIC IMPORTED GLOBAL)
+add_dependencies(rust_mysql rust_mysql_build)
+set_target_properties(rust_mysql PROPERTIES
+    IMPORTED_LOCATION "${RUST_MYSQL_LIB_PATH}"
+)
 
 # SQLite3
 find_package(SQLite3 REQUIRED)
@@ -71,8 +91,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         nlohmann_json::nlohmann_json
         SQLite::SQLite3
         fmt::fmt-header-only
-        endstone_mysql_api
         endstone_inventoryui
+        rust_mysql
+        ${RUST_MYSQL_SYSTEM_LIBS}
 )
 
 find_package(Git QUIET)

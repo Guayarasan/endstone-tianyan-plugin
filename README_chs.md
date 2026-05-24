@@ -98,7 +98,12 @@ WebUI被启动后，会在插件数据目录下生成WebUI配置文件web_config
         "minecraft:skeleton",
         "minecraft:bogged",
         "minecraft:slime"
-    ]
+    ],
+    "mysql_host": "127.0.0.1",
+    "mysql_port": 3306,
+    "mysql_user": "root",
+    "mysql_password": "",
+    "mysql_database": "endstone"
 }
 ```
 
@@ -109,6 +114,11 @@ WebUI被启动后，会在插件数据目录下生成WebUI配置文件web_config
 - `enable_web_ui`: 是否启用 WebUI
 - `language`: 插件语言
 - `no_log_mobs`: 不被记录的实体列表
+- `mysql_host`: MySQL 服务器地址（`database_type` 为 `mysql` 时使用）
+- `mysql_port`: MySQL 服务器端口
+- `mysql_user`: MySQL 登录用户
+- `mysql_password`: MySQL 登录密码
+- `mysql_database`: MySQL 数据库名
 
 > 在涉及实体事件中，除非实体被命名过，否则不会记录 `no_log_mobs` 中的实体。
 
@@ -118,18 +128,24 @@ WebUI被启动后，会在插件数据目录下生成WebUI配置文件web_config
 
 ### MySQL 数据库支持
 
-天眼插件支持使用 MySQL 作为日志存储后端，依赖 [endstone-mysql-api](https://github.com/yuhangle/endstone-mysql-api) 插件提供的 Service 接口与 MySQL 交互。
+天眼插件支持使用 MySQL 作为日志存储后端。MySQL 客户端使用纯 Rust 实现内置于插件中，无需额外安装依赖。
 
-使用 MySQL 前，请确保已安装 `endstone-mysql-api` 插件并正确配置了 MySQL 连接（参考其文档）。然后修改天眼插件配置 `plugins/tianyan_data/config.json`：
+启用 MySQL 需要修改 `plugins/tianyan_data/config.json`：
 
 ```json
 {
-    "database_type": "mysql"
+    "database_type": "mysql",
+    "mysql_host": "127.0.0.1",
+    "mysql_port": 3306,
+    "mysql_user": "root",
+    "mysql_password": "",
+    "mysql_database": "endstone"
 }
 ```
 
-注意：
-- 若 `database_type` 设置为 `mysql` 但 `endstone-mysql-api` 插件未加载或连接失败，天眼插件将自动回退使用 SQLite
+配置说明：
+- MySQL 连接参数使用以上默认值，仅需修改需要变更的字段
+- 若 MySQL 连接失败，插件将自动回退使用 SQLite
 - 切换数据库类型不会自动迁移已有数据，请手动备份或自行迁移
 
 ## 📜 插件命令使用方法

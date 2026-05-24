@@ -96,6 +96,5 @@ private:
 #ifdef _WIN32
     void dump_webui_log_once() const;
 #endif
-    shared_ptr<endstone::Task> mysql_get_;
     void default_init_sqlite_();
 };

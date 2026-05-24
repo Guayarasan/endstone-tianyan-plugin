@@ -123,5 +123,8 @@
   "A background operation is in progress. Please wait for it to complete": "后台操作正在进行中，请等待完成",
   "Searching in the background, please wait": "正在后台搜索，请稍候",
   "Previous query cancelled, starting a new one": "已取消上一次查询，开始新的搜索",
-  "{0}'s Inventory": "{0} 的物品栏"
+  "{0}'s Inventory": "{0} 的物品栏",
+  "Using Rust MySQL database backend": "使用 Rust MySQL 数据库后端",
+  "MySQL database table initialization failed!": "MySQL 数据表初始化失败！",
+  "Failed to connect to MySQL, falling back to SQLite database": "MySQL 连接失败，回退到 SQLite 数据库"
 }

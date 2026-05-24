@@ -101,7 +101,12 @@ Default configuration:
         "minecraft:skeleton",
         "minecraft:bogged",
         "minecraft:slime"
-    ]
+    ],
+    "mysql_host": "127.0.0.1",
+    "mysql_port": 3306,
+    "mysql_user": "root",
+    "mysql_password": "",
+    "mysql_database": "endstone"
 }
 ```
 
@@ -112,6 +117,11 @@ Configuration item descriptions:
 - `enable_web_ui`: Enable WebUI
 - `language`: Plugin language
 - `no_log_mobs`: List of entities not to be logged
+- `mysql_host`: MySQL server address (used when `database_type` is `mysql`)
+- `mysql_port`: MySQL server port
+- `mysql_user`: MySQL login user
+- `mysql_password`: MySQL login password
+- `mysql_database`: MySQL database name
 
 > In entity-related events, entities in `no_log_mobs` will not be recorded unless the entity has been named.
 
@@ -121,18 +131,24 @@ Example: To change to English, modify the `language` item to `"en_US"`.
 
 ### MySQL Database Support
 
-The Tianyan plugin supports using MySQL as the log storage backend, relying on the Service interface provided by the [endstone-mysql-api](https://github.com/yuhangle/endstone-mysql-api) plugin.
+The Tianyan plugin supports using MySQL as the log storage backend. The MySQL client is built into the plugin using a pure Rust implementation (no additional dependencies required).
 
-Before using MySQL, make sure the `endstone-mysql-api` plugin is installed and MySQL connection is properly configured (refer to its documentation). Then modify the Tianyan plugin config at `plugins/tianyan_data/config.json`:
+To enable MySQL, modify `plugins/tianyan_data/config.json`:
 
 ```json
 {
-    "database_type": "mysql"
+    "database_type": "mysql",
+    "mysql_host": "127.0.0.1",
+    "mysql_port": 3306,
+    "mysql_user": "root",
+    "mysql_password": "",
+    "mysql_database": "endstone"
 }
 ```
 
-Notes:
-- If `database_type` is set to `mysql` but the `endstone-mysql-api` plugin is not loaded or the connection fails, the Tianyan plugin will automatically fall back to SQLite
+Configuration notes:
+- The MySQL connection parameters use the defaults shown above; only change what you need
+- If MySQL connection fails, the plugin will automatically fall back to SQLite
 - Switching database types will not automatically migrate existing data; please back up manually or migrate on your own
 
 ## 📜 Plugin Command Usage

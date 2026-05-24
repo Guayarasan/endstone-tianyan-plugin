@@ -38,6 +38,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Rust toolchain
+        run: rustup show
+
       # ===== Linux =====
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'

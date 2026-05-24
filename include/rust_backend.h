@@ -2,16 +2,26 @@
 
 #include "database_backend.h"
 
-#include <memory>
+#include <cstdint>
+#include <string>
 
-namespace mysql_api {
-class MySQLAPI;
-}
+struct RustMySQLConfig {
+    std::string host = "127.0.0.1";
+    uint16_t port = 3306;
+    std::string user = "root";
+    std::string password;
+    std::string database = "endstone";
+};
 
-class MysqlBackend : public IDatabaseBackend {
+class RustBackend : public IDatabaseBackend {
 public:
-    explicit MysqlBackend(std::shared_ptr<mysql_api::MySQLAPI> mysql)
-        : mysql_(std::move(mysql)) {}
+    explicit RustBackend(const RustMySQLConfig& config);
+    ~RustBackend() override;
+
+    RustBackend(const RustBackend&) = delete;
+    RustBackend& operator=(const RustBackend&) = delete;
+
+    [[nodiscard]] bool connected() const { return connected_; }
 
     int init_database() override;
 
@@ -71,10 +81,24 @@ public:
     int getAllLog(std::vector<std::map<std::string, std::string>>& result) override;
 
 private:
-    std::shared_ptr<mysql_api::MySQLAPI> mysql_;
+    void* handle_ = nullptr;
+    bool connected_ = false;
 
-    int queryResultToMaps(
-        std::vector<std::map<std::string, std::string>>& result,
-        const std::string& sql,
-        const std::vector<std::string>& params = {}) const;
+    // Convert a query result (opaque pointer) to vector-of-maps
+    static int resultToMaps(void* result,
+                     std::vector<std::map<std::string, std::string>>& out) ;
+
+    // Run a parameterized query and return result as maps
+    int queryToMaps(const std::string& sql,
+                    std::vector<std::map<std::string, std::string>>& result,
+                    const std::vector<std::string>& params = {}) const;
+
+    // Run a parameterized query with cancel support
+    int queryToMapsWithCancel(const std::string& sql,
+                              std::vector<std::map<std::string, std::string>>& result,
+                              const std::vector<std::string>& params,
+                              std::atomic<bool>* cancel) const;
+
+    // Get the last error string from Rust
+    [[nodiscard]] std::string lastError() const;
 };

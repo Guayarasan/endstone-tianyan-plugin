@@ -9,8 +9,7 @@
 #include "tianyan_core.h"
 #include "database_util.h"
 #include "sqlite_backend.h"
-#include "mysql_backend.h"
-#include <endstone_mysql_api/mysql_api.h>
+#include "rust_backend.h"
 #include <inventoryui_init.h>
 
 // 为了方便在宏里调用，定义一个短函数
@@ -105,7 +104,12 @@ void TianyanPlugin::datafile_check() const {
         {"database_type", "sqlite"},
         {"10s_message_max", 6},
         {"10s_command_max", 12},
-        {"no_log_mobs", {"minecraft:zombie_pigman","minecraft:zombie","minecraft:skeleton","minecraft:bogged","minecraft:slime"}}
+        {"no_log_mobs", {"minecraft:zombie_pigman","minecraft:zombie","minecraft:skeleton","minecraft:bogged","minecraft:slime"}},
+        {"mysql_host", "127.0.0.1"},
+        {"mysql_port", 3306},
+        {"mysql_user", "root"},
+        {"mysql_password", ""},
+        {"mysql_database", "endstone"}
     };
 
     if (!(std::filesystem::exists(TianyanCore::dataPath))) {
@@ -389,33 +393,31 @@ void TianyanPlugin::onEnable()
 
     // 创建数据库后端
     if (db_type == "mysql") {
-        mysql_get_ = getServer().getScheduler().runTaskTimer(*this, [this]() {
-            if (const auto* mysql_plugin = getServer().getPluginManager().getPlugin("mysql_api"); mysql_plugin && mysql_plugin->isEnabled()) {
-                if (auto mysql_service = getServer().getServiceManager().load<mysql_api::MySQLAPI>("MySQLAPI"); mysql_service && mysql_service->is_connected()) {
-                    db_backend_ = std::make_unique<MysqlBackend>(mysql_service);
-                    getLogger().info("Using MySQL database backend");
+        RustMySQLConfig config;
+        try {
+            config.host = json_msg.value("mysql_host", std::string("127.0.0.1"));
+            config.port = json_msg.value("mysql_port", 3306);
+            config.user = json_msg.value("mysql_user", std::string("root"));
+            config.password = json_msg.value("mysql_password", std::string(""));
+            config.database = json_msg.value("mysql_database", std::string("endstone"));
+        } catch (const std::exception& e) {
+            getLogger().warning(std::string("MySQL config parse error: ") + e.what() + ", using defaults");
+        }
 
-                    // 初始化数据库
-                    if (db_backend_->init_database() != 0) {
-                        getLogger().error("Database initialization failed!");
-                        getServer().getPluginManager().disablePlugin(*this);
-                        return;
-                    }
-                    //重载核心
-                    tyCore = std::make_unique<TianyanCore>(*db_backend_);
-                    is_db_over = true;
-                    getServer().getScheduler().cancelTask(mysql_get_->getTaskId());
-                } else {
-                    getLogger().warning("MySQLAPI is not connected, falling back to SQLite");
-                    default_init_sqlite_();
-                    getServer().getScheduler().cancelTask(mysql_get_->getTaskId());
-                }
-            } else {
-                getLogger().warning("MySQLAPI plugin not found, falling back to SQLite");
-                default_init_sqlite_();
-                getServer().getScheduler().cancelTask(mysql_get_->getTaskId());
+        if (auto rust_backend = std::make_unique<RustBackend>(config); rust_backend->connected()) {
+            db_backend_ = std::move(rust_backend);
+            getLogger().info(Tran->getLocal("Using Rust MySQL database backend"));
+
+            if (db_backend_->init_database() != 0) {
+                getLogger().error(Tran->getLocal("MySQL database table initialization failed!"));
+                getServer().getPluginManager().disablePlugin(*this);
+                return;
             }
-        }, 100, 20);
+            is_db_over = true;
+        } else {
+            getLogger().warning(Tran->getLocal("Failed to connect to MySQL, falling back to SQLite database"));
+            default_init_sqlite_();
+        }
     }
     else if (db_type == "sqlite") {
         default_init_sqlite_();
@@ -520,12 +522,24 @@ void TianyanPlugin::onDisable()
 {
     inventoryui::shutdown();
     getLogger().info("onDisable is called");
+
+    getServer().getScheduler().cancelTasks(*this);
     logsCacheWrite();
+
+    // 清除剩余缓存
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        logDataCache.clear();
+    }
+
     if (TianyanCore::enable_web_ui)
     {
         stop_web_server();
     }
-    getServer().getScheduler().cancelTasks(*this);
+
+    // NOTE: tyCore 和 db_backend_ 由插件析构时自动销毁。
+    // 不可在此处手动 reset() —— logsCacheWrite 通过 detach() 线程异步访问它们，
+    // 手动 reset 会造成 use-after-free。
 }
 
 bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::Command &command, const std::vector<std::string> &args)
