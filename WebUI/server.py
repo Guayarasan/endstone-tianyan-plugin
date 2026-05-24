@@ -218,35 +218,21 @@ def load_language(lang_code="en_US"):
         return {}
 
 
-# 简略 TOML 解析器（仅处理 mysql_api 配置格式）
-def _parse_simple_toml(path):
-    """解析 key = "value" 形式的简单 TOML 文件，返回 dict。"""
-    config = {}
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#') or line.startswith('['):
-                    continue
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    config[key.strip()] = value.strip().strip('"').strip("'")
-    except (FileNotFoundError, IOError) as e:
-        logging.warning(f"Failed to read TOML config {path}: {e}")
-    return config
-
-
 def _load_mysql_config():
-    """从 mysql_api 插件配置读取 MySQL 连接信息。"""
-    mysql_config_path = os.path.join(BASE_DIR, "..", "..", "mysql_api", "config.toml")
-    raw = _parse_simple_toml(mysql_config_path)
-    # 补齐缺失字段
+    """从天眼插件配置读取 MySQL 连接信息。"""
+    tianyan_config_path = os.path.join(BASE_DIR, "..", "config.json")
+    raw = {}
+    try:
+        with open(tianyan_config_path, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logging.warning(f"Failed to read tianyan config: {e}, using defaults")
     return {
-        "host": raw.get("host", "127.0.0.1"),
-        "port": int(raw.get("port", 3306)),
-        "user": raw.get("user", "root"),
-        "password": raw.get("password", ""),
-        "database": raw.get("database", "endstone"),
+        "host": raw.get("mysql_host", "127.0.0.1"),
+        "port": int(raw.get("mysql_port", 3306)),
+        "user": raw.get("mysql_user", "root"),
+        "password": raw.get("mysql_password", ""),
+        "database": raw.get("mysql_database", "endstone"),
     }
 
 
