@@ -244,6 +244,17 @@ This command can find areas with the highest entity density in the server and su
 This command can restore partial behaviors of players or entities. Including: player direct block destruction and placement, block destruction caused by entity explosions, entity deaths, and block changes caused by player interactions. Entity deaths will not restore attributes such as fur color and age; water-containing blocks created by players cannot be restored to their original state. The principle is to use setblock and summon commands to restore from the log database.
 Without parameters, a quick menu will pop up where players can query. The maximum restorable radius is 100 (blocks), and time is unlimited. The actual restorable radius is affected by chunks, and restoration will not be possible if beyond the limit distance of setblock and summon commands, requiring you to get closer and try again)
 
+### `/tymigrate` - Migrate database between SQLite and MySQL (operator only)
+```
+/tymigrate <sqlite|mysql> <sqlite|mysql>
+```
+
+Migrates all log data from the source database backend to the target backend. The active backend is automatically switched upon successful completion, no server restart required.
+
+Examples:
+- `/tymigrate sqlite mysql` — migrate from SQLite to MySQL
+- `/tymigrate mysql sqlite` — migrate from MySQL to SQLite
+
 ## 🔧 Modification & Building
 
 ### Cloud Building

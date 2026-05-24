@@ -93,8 +93,11 @@ private:
     std::mutex async_tasks_mutex_;
     uint64_t next_task_id_ = 1;
     shared_ptr<endstone::Task> windows_print_webui_log;
+    std::string db_type_ = "sqlite";
 #ifdef _WIN32
     void dump_webui_log_once() const;
 #endif
     void default_init_sqlite_();
+    void checkMigrateStatus();
+    void runMigration(const std::string& source, const std::string& target, const std::string& sender_name) const;
 };

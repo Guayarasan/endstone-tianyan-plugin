@@ -241,6 +241,17 @@ WebUI被启动后，会在插件数据目录下生成WebUI配置文件web_config
 此命令能够恢复玩家或实体部分行为。包括：玩家对方块的直接破坏与放置、实体爆炸产生的方块破坏、实体的死亡、玩家交互造成方块的变化。其中实体死亡不会还原毛色、年龄等属性；玩家制造的含水方块无法被还原为原始状态。其原理为使用setblock和summon命令从日志数据库中还原。
 无参数则将弹出快捷菜单，玩家可在菜单中查询。最大可恢复半径为100(格),时间无限。实际可恢复半径受区块影响，超出setblock命令和summon命令的极限距离将无法恢复，需要靠近再来一次)
 
+### `/tymigrate` - 在 SQLite 与 MySQL 之间迁移数据库(仅管理员)
+```
+/tymigrate <sqlite|mysql> <sqlite|mysql>
+```
+
+将全部日志数据从源数据库后端迁移到目标后端。迁移成功后自动切换活动后端，无需重启服务器。
+
+示例：
+- `/tymigrate sqlite mysql` — 从 SQLite 迁移到 MySQL
+- `/tymigrate mysql sqlite` — 从 MySQL 迁移到 SQLite
+
 ## 🔧 修改 & 构建
 
 ### 云构建

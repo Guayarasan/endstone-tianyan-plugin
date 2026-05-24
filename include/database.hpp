@@ -499,7 +499,7 @@ namespace yuhangle {
             const auto conn = pool.getConnection();
             sqlite3* db = conn->get();
 
-            const std::string sql = "INSERT INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
+            const std::string sql = "INSERT OR IGNORE INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
                               "world, obj_id, obj_name, time, type, data, status) VALUES (?, ?, "
                               "?, ?, ?, ?, "
                               "?, ?, ?, ?, ?, ?, ?);";
@@ -558,7 +558,7 @@ namespace yuhangle {
                 return rc;
             }
 
-            const std::string sql = "INSERT INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
+            const std::string sql = "INSERT OR IGNORE INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
                               "world, obj_id, obj_name, time, type, data, status) VALUES (?, ?, "
                               "?, ?, ?, ?, "
                               "?, ?, ?, ?, ?, ?, ?);";

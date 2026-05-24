@@ -126,5 +126,15 @@
   "{0}'s Inventory": "{0} 的物品栏",
   "Using Rust MySQL database backend": "使用 Rust MySQL 数据库后端",
   "MySQL database table initialization failed!": "MySQL 数据表初始化失败！",
-  "Failed to connect to MySQL, falling back to SQLite database": "MySQL 连接失败，回退到 SQLite 数据库"
+  "Failed to connect to MySQL, falling back to SQLite database": "MySQL 连接失败，回退到 SQLite 数据库",
+  "Migrate database between SQLite and MySQL": "在 SQLite 与 MySQL 间迁移数据库",
+  "A migration is already in progress": "已有迁移任务正在进行中",
+  "Starting migration from {} to {}": "开始从 {} 迁移到 {}",
+  "No data to migrate": "没有需要迁移的数据",
+  "Migration completed": "迁移完成",
+  "{0} entries migrated from {1} to {2}": "从 {1} 迁移到 {2}，共 {0} 条记录",
+  "Migration failed": "迁移失败",
+  "Switching active database backend to {}": "正在切换活动数据库后端到 {}",
+  "Active backend switched to {}": "活动数据库后端已切换为 {}",
+  "Restarting WebUI for new database backend...": "正在为新的数据库后端重启 WebUI..."
 }

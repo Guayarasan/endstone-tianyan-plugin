@@ -126,5 +126,15 @@
   "{0}'s Inventory": "Инвентарь {0}",
   "Using Rust MySQL database backend": "Используется Rust MySQL бэкенд",
   "MySQL database table initialization failed!": "Ошибка инициализации таблицы MySQL!",
-  "Failed to connect to MySQL, falling back to SQLite database": "Не удалось подключиться к MySQL, используется SQLite"
+  "Failed to connect to MySQL, falling back to SQLite database": "Не удалось подключиться к MySQL, используется SQLite",
+  "Migrate database between SQLite and MySQL": "Миграция БД между SQLite и MySQL",
+  "A migration is already in progress": "Миграция уже выполняется",
+  "Starting migration from {} to {}": "Начало миграции с {} на {}",
+  "No data to migrate": "Нет данных для миграции",
+  "Migration completed": "Миграция завершена",
+  "{0} entries migrated from {1} to {2}": "Перенесено {0} записей с {1} на {2}",
+  "Migration failed": "Миграция не удалась",
+  "Switching active database backend to {}": "Переключение активного БД-бэкенда на {}",
+  "Active backend switched to {}": "Активный БД-бэкенд переключён на {}",
+  "Restarting WebUI for new database backend...": "Перезапуск WebUI для нового бэкенда БД..."
 }

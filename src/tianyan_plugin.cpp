@@ -88,6 +88,12 @@ ENDSTONE_PLUGIN("tianyan_plugin", TIANYAN_PLUGIN_VERSION, TianyanPlugin)
                     )
             .permissions("ty.command.op");
 
+        command("tymigrate")
+            .description(T("Migrate database between SQLite and MySQL"))
+            .usages("/tymigrate <sqlite|mysql> <sqlite|mysql>"
+                    )
+            .permissions("ty.command.op");
+
     permission("ty.command.member")
             .description(T("Allow users to use the /ty command."))
             .default_(endstone::PermissionDefault::True);
@@ -384,15 +390,14 @@ void TianyanPlugin::onEnable()
 
     // 读取配置文件选择数据库后端
     json json_msg = read_config();
-    string db_type = "sqlite";
     try {
         if (json_msg.contains("database_type")) {
-            db_type = json_msg["database_type"].get<std::string>();
+            db_type_ = json_msg["database_type"].get<std::string>();
         }
     } catch (const std::exception&) {}
 
     // 创建数据库后端
-    if (db_type == "mysql") {
+    if (db_type_ == "mysql") {
         RustMySQLConfig config;
         try {
             config.host = json_msg.value("mysql_host", std::string("127.0.0.1"));
@@ -419,7 +424,7 @@ void TianyanPlugin::onEnable()
             default_init_sqlite_();
         }
     }
-    else if (db_type == "sqlite") {
+    else if (db_type_ == "sqlite") {
         default_init_sqlite_();
     }
 
@@ -452,6 +457,8 @@ void TianyanPlugin::onEnable()
     getServer().getScheduler().runTaskTimer(*this, [&]() {logsCacheWrite();},0,60);
     //数据库清理后台检查
     getServer().getScheduler().runTaskTimer(*this,[&](){checkDatabaseCleanStatus();},0,20);
+    //数据库迁移状态检查
+    getServer().getScheduler().runTaskTimer(*this,[&](){checkMigrateStatus();},0,20);
     //后台查询任务检查
     getServer().getScheduler().runTaskTimer(*this,[&](){checkAsyncTasks();},0,20);
     //完成外部类初始化
@@ -889,7 +896,273 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
             }
         }
     }
+    else if (command.getName() == "tymigrate") {
+        if (args.size() < 2) {
+            sender.sendErrorMessage("Usage: /tymigrate <sqlite|mysql> <sqlite|mysql>");
+            return false;
+        }
+        const string& src = args[0];
+        const string& dst = args[1];
+        if ((src != "sqlite" && src != "mysql") || (dst != "sqlite" && dst != "mysql")) {
+            sender.sendErrorMessage("Arguments must be 'sqlite' or 'mysql'");
+            return false;
+        }
+        if (src == dst) {
+            sender.sendErrorMessage("Source and target must be different");
+            return false;
+        }
+        if (yuhangle::migrate_status == 1) {
+            sender.sendErrorMessage(Tran->getLocal("A migration is already in progress"));
+            return false;
+        }
+        if (yuhangle::clean_data_status == 2) {
+            sender.sendErrorMessage(Tran->getLocal("A background operation is in progress. Please wait for it to complete"));
+            return false;
+        }
+        sender.sendMessage(endstone::ColorFormat::Yellow + Tran->tr(Tran->getLocal("Starting migration from {} to {}"), src, dst));
+        runMigration(src, dst, sender.getName());
+    }
     return true;
+}
+
+void TianyanPlugin::runMigration(const std::string& source, const std::string& target, const std::string& sender_name) const
+{
+    namespace fs = std::filesystem;
+
+    yuhangle::migrate_status = 1;
+    yuhangle::migrate_message.clear();
+    yuhangle::migrate_progress = 0;
+    yuhangle::migrate_total = 0;
+    yuhangle::migrate_source_type = source;
+    yuhangle::migrate_target_type = target;
+    yuhangle::migrate_sender_name = sender_name;
+
+    std::thread migrate_thread([this, source, target]() {
+        namespace fs1 = std::filesystem;
+        try {
+            // Build source and target backends
+            std::unique_ptr<IDatabaseBackend> src_backend;
+            std::unique_ptr<IDatabaseBackend> dst_backend;
+            const fs1::path currentPath = fs1::current_path();
+            const fs1::path fullPath = currentPath / TianyanCore::dbPath;
+
+            if (source == "sqlite") {
+                src_backend = std::make_unique<SqliteBackend>(fullPath.string());
+            } else {
+                // Read MySQL config from config.json
+                json cfg = read_config();
+                RustMySQLConfig mysql_cfg;
+                mysql_cfg.host = cfg.value("mysql_host", std::string("127.0.0.1"));
+                mysql_cfg.port = cfg.value("mysql_port", 3306);
+                mysql_cfg.user = cfg.value("mysql_user", std::string("root"));
+                mysql_cfg.password = cfg.value("mysql_password", std::string(""));
+                mysql_cfg.database = cfg.value("mysql_database", std::string("endstone"));
+                src_backend = std::make_unique<RustBackend>(mysql_cfg);
+            }
+
+            if (target == "sqlite") {
+                dst_backend = std::make_unique<SqliteBackend>(fullPath.string());
+            } else {
+                json cfg = read_config();
+                RustMySQLConfig mysql_cfg;
+                mysql_cfg.host = cfg.value("mysql_host", std::string("127.0.0.1"));
+                mysql_cfg.port = cfg.value("mysql_port", 3306);
+                mysql_cfg.user = cfg.value("mysql_user", std::string("root"));
+                mysql_cfg.password = cfg.value("mysql_password", std::string(""));
+                mysql_cfg.database = cfg.value("mysql_database", std::string("endstone"));
+                dst_backend = std::make_unique<RustBackend>(mysql_cfg);
+            }
+
+            // Init target
+            if (dst_backend->init_database() != 0) {
+                yuhangle::migrate_message = {"Target database init failed"};
+                yuhangle::migrate_status = -1;
+                return;
+            }
+
+            // Verify source has LOGDATA table
+            {
+                std::vector<std::map<std::string, std::string>> check;
+                if (src_backend->querySQL("SELECT COUNT(*) AS cnt FROM LOGDATA", check) != 0) {
+                    yuhangle::migrate_message = {
+                        "Source " + source + " database has no LOGDATA table. "
+                        "Make sure the source has been used before migrating."
+                    };
+                    yuhangle::migrate_status = -1;
+                    return;
+                }
+            }
+
+            // Read all data from source
+            std::vector<std::map<std::string, std::string>> raw_data;
+            if (src_backend->getAllLog(raw_data) != 0) {
+                yuhangle::migrate_message = {"Failed to read data from source"};
+                yuhangle::migrate_status = -1;
+                return;
+            }
+
+            yuhangle::migrate_total = static_cast<int>(raw_data.size());
+            if (raw_data.empty()) {
+                yuhangle::migrate_message = {"No data to migrate"};
+                yuhangle::migrate_status = 2;
+                return;
+            }
+
+            // Convert to DatabaseLogEntry and batch insert
+            constexpr int BATCH_SIZE = 1000;
+            std::vector<DatabaseLogEntry> batch;
+            batch.reserve(BATCH_SIZE);
+
+            for (size_t i = 0; i < raw_data.size(); ++i) {
+                const auto& row = raw_data[i];
+                DatabaseLogEntry entry;
+                entry.uuid = row.at("uuid");
+                entry.id = row.at("id");
+                entry.name = row.at("name");
+                entry.pos_x = std::stod(row.at("pos_x"));
+                entry.pos_y = std::stod(row.at("pos_y"));
+                entry.pos_z = std::stod(row.at("pos_z"));
+                entry.world = row.at("world");
+                entry.obj_id = row.at("obj_id");
+                entry.obj_name = row.at("obj_name");
+                entry.time = std::stoll(row.at("time"));
+                entry.type = row.at("type");
+                entry.data = row.at("data");
+                entry.status = row.at("status");
+                batch.push_back(std::move(entry));
+
+                if (batch.size() >= BATCH_SIZE) {
+                    if (dst_backend->addLogs(batch) != 0) {
+                        yuhangle::migrate_message = {"Write to target failed at row " + std::to_string(i + 1)};
+                        yuhangle::migrate_status = -1;
+                        return;
+                    }
+                    batch.clear();
+                    yuhangle::migrate_progress = static_cast<int>(i + 1);
+                }
+            }
+
+            // Last batch
+            if (!batch.empty()) {
+                if (dst_backend->addLogs(batch) != 0) {
+                    yuhangle::migrate_message = {"Write to target failed"};
+                    yuhangle::migrate_status = -1;
+                    return;
+                }
+            }
+
+            yuhangle::migrate_progress = yuhangle::migrate_total;
+
+            // Swap active backend if target matches a different db_type
+            // (keep the migration result for the status checker to finalize)
+            yuhangle::migrate_message = {
+                "Migration complete",
+                std::to_string(yuhangle::migrate_total) + " entries migrated"
+            };
+            yuhangle::migrate_status = 2;
+
+        } catch (const std::exception& e) {
+            yuhangle::migrate_message = {"Migration error: " + std::string(e.what())};
+            yuhangle::migrate_status = -1;
+        }
+    });
+    migrate_thread.detach();
+}
+
+void TianyanPlugin::checkMigrateStatus()
+{
+    namespace fs = std::filesystem;
+    if (yuhangle::migrate_status == 0) return;
+
+    const auto player = getServer().getPlayer(yuhangle::migrate_sender_name);
+    const auto green = endstone::ColorFormat::Green;
+    const auto red = endstone::ColorFormat::Red;
+
+    if (yuhangle::migrate_status == 2) {
+        if (yuhangle::migrate_total > 0) {
+            std::string detail = Tran->tr(Tran->getLocal("{0} entries migrated from {1} to {2}"),
+                                           std::to_string(yuhangle::migrate_total),
+                                           yuhangle::migrate_source_type,
+                                           yuhangle::migrate_target_type);
+            std::string msg = green + Tran->getLocal("Migration completed") + " " + detail;
+            if (player) player->sendMessage(msg);
+            getLogger().info(msg);
+        } else {
+            std::string msg = green + Tran->getLocal("Migration completed");
+            if (player) player->sendMessage(msg);
+            getLogger().info(msg);
+        }
+        // Swap active backend to match target type
+        bool need_swap = false;
+        if (yuhangle::migrate_target_type == "sqlite" && db_type_ != "sqlite") need_swap = true;
+        if (yuhangle::migrate_target_type == "mysql" && db_type_ != "mysql") need_swap = true;
+
+        if (need_swap) {
+            getLogger().info(Tran->tr(Tran->getLocal("Switching active database backend to {}"), yuhangle::migrate_target_type));
+
+            // Suspend writes
+            is_db_over = false;
+
+            // Recreate core with the new backend type
+            if (yuhangle::migrate_target_type == "sqlite") {
+                const fs::path fullPath = fs::current_path() / TianyanCore::dbPath;
+                db_backend_ = std::make_unique<SqliteBackend>(fullPath.string());
+                db_backend_->init_database();
+            } else {
+                json cfg = read_config();
+                RustMySQLConfig mysql_cfg;
+                mysql_cfg.host = cfg.value("mysql_host", std::string("127.0.0.1"));
+                mysql_cfg.port = cfg.value("mysql_port", 3306);
+                mysql_cfg.user = cfg.value("mysql_user", std::string("root"));
+                mysql_cfg.password = cfg.value("mysql_password", std::string(""));
+                mysql_cfg.database = cfg.value("mysql_database", std::string("endstone"));
+                db_backend_ = std::make_unique<RustBackend>(mysql_cfg);
+            }
+
+            // Update db_type string for next server start
+            db_type_ = yuhangle::migrate_target_type;
+
+            // Persist to config.json
+            try {
+                json cfg;
+                if (std::ifstream in(TianyanCore::config_path); in.is_open()) {
+                    in >> cfg;
+                }
+                cfg["database_type"] = db_type_;
+                if (std::ofstream out(TianyanCore::config_path); out.is_open()) {
+                    out << cfg.dump(4);
+                }
+            } catch (const std::exception& e) {
+                getLogger().error("Failed to update config.json: {}", e.what());
+            }
+
+            // Rebuild core with new backend
+            tyCore = std::make_unique<TianyanCore>(*db_backend_);
+            is_db_over = true;
+            getLogger().info(Tran->tr(Tran->getLocal("Active backend switched to {}"), yuhangle::migrate_target_type));
+
+            // Restart WebUI to pick up new database config
+            if (TianyanCore::enable_web_ui) {
+                getLogger().info(Tran->getLocal("Restarting WebUI for new database backend..."));
+                stop_web_server();
+                start_web_server(TianyanCore::dbPath);
+            }
+        }
+
+        yuhangle::migrate_status = 0;
+        yuhangle::migrate_message.clear();
+    }
+    else if (yuhangle::migrate_status == -1) {
+        std::string err_msg = red + Tran->getLocal("Migration failed") + ": ";
+        for (const auto& msg : yuhangle::migrate_message) {
+            err_msg += Tran->getLocal(msg) + " ";
+        }
+        if (player) player->sendErrorMessage(err_msg);
+        getLogger().error(err_msg);
+
+        yuhangle::migrate_status = 0;
+        yuhangle::migrate_message.clear();
+    }
 }
 
     //缓存写入机制

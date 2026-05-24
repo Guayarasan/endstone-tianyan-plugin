@@ -243,7 +243,7 @@ int RustBackend::addLog(
     if (!handle_) return -1;
 
     const std::string sql =
-        "INSERT INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
+        "INSERT IGNORE INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
         "world, obj_id, obj_name, time, type, data, status) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -274,7 +274,7 @@ int RustBackend::addLogs(const std::vector<DatabaseLogEntry>& entries) {
     rust_mysql_execute(handle_, "START TRANSACTION");
 
     const std::string sql =
-        "INSERT INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
+        "INSERT IGNORE INTO LOGDATA (uuid, id, name, pos_x, pos_y, pos_z, "
         "world, obj_id, obj_name, time, type, data, status) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 

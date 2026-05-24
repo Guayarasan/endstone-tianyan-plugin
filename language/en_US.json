@@ -125,5 +125,15 @@
   "{0}'s Inventory": "{0}'s Inventory",
   "Using Rust MySQL database backend": "Using Rust MySQL database backend",
   "MySQL database table initialization failed!": "MySQL database table initialization failed!",
-  "Failed to connect to MySQL, falling back to SQLite database": "Failed to connect to MySQL, falling back to SQLite database"
+  "Failed to connect to MySQL, falling back to SQLite database": "Failed to connect to MySQL, falling back to SQLite database",
+  "Migrate database between SQLite and MySQL": "Migrate database between SQLite and MySQL",
+  "A migration is already in progress": "A migration is already in progress",
+  "Starting migration from {} to {}": "Starting migration from {} to {}",
+  "No data to migrate": "No data to migrate",
+  "Migration completed": "Migration completed",
+  "{0} entries migrated from {1} to {2}": "{0} entries migrated from {1} to {2}",
+  "Migration failed": "Migration failed",
+  "Switching active database backend to {}": "Switching active database backend to {}",
+  "Active backend switched to {}": "Active backend switched to {}",
+  "Restarting WebUI for new database backend...": "Restarting WebUI for new database backend..."
 }
