@@ -135,8 +135,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
-# Release 构建后自动 strip（仅 Linux/macOS，Windows debug 在 .pdb 中）
-if(RELEASE_VERSION AND NOT MSVC)
+# Linux Release 构建后自动 strip
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND strip $<TARGET_FILE:${PROJECT_NAME}>
         COMMENT "Stripping debug symbols from ${PROJECT_NAME}")
