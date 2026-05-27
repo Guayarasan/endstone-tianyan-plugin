@@ -140,5 +140,7 @@
   "Player {} not found (offline)": "Player {} not found (offline)",
   "Inventory is empty": "Inventory is empty",
   "Querying offline inventory...": "Querying offline inventory...",
-  "Tip: The player must have joined at least once to be cached.": "Tip: The player must have joined at least once to be cached."
+  "Tip: The player must have joined at least once to be cached.": "Tip: The player must have joined at least once to be cached.",
+  "Copied to your inventory": "Copied to your inventory",
+  "Inventory full, cannot copy item": "Inventory full, cannot copy item"
 }

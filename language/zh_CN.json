@@ -141,5 +141,7 @@
   "Player {} not found (offline)": "玩家{}未找到 (离线)",
   "Inventory is empty": "物品栏为空",
   "Querying offline inventory...": "正在查询离线物品栏...",
-  "Tip: The player must have joined at least once to be cached.": "提示：玩家必须至少加入过一次服务器才会被缓存。"
+  "Tip: The player must have joined at least once to be cached.": "提示：玩家必须至少加入过一次服务器才会被缓存。",
+  "Copied to your inventory": "已复制到你的背包",
+  "Inventory full, cannot copy item": "背包已满，无法复制物品"
 }

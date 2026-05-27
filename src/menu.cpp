@@ -469,6 +469,21 @@ bool Menu::showPlayerInventoryUI(endstone::Player &sender, endstone::Player &tar
         inv->set_item(49, *offhand);
     }
 
+    // 注册点击回调：复制物品到点击者背包
+    menu->set_listener([this](const endstone::Player &clicker, int,
+                              const endstone::ItemStack &item,
+                              inventoryui::UIInventory &) {
+        if (item.getType().getId() == "minecraft:air") return;
+        auto copy = item;
+        if (const auto leftover =
+                clicker.getInventory().addItem(std::move(copy));
+            leftover.empty()) {
+            clicker.sendMessage("§a" + tran_->tr("Copied to your inventory"));
+        } else {
+            clicker.sendMessage("§c" + tran_->tr("Inventory full, cannot copy item"));
+        }
+    });
+
     menu->send_to(sender);
     return true;
 }
@@ -498,6 +513,21 @@ bool Menu::showOfflinePlayerInventoryUI(endstone::Player &sender, const std::str
     if (armor[2]) inv->set_item(47, *armor[2]);
     if (armor[3]) inv->set_item(48, *armor[3]);
     if (offhand) inv->set_item(49, *offhand);
+
+    // 注册点击回调：复制物品到点击者背包
+    menu->set_listener([this](const endstone::Player &clicker, int,
+                              const endstone::ItemStack &item,
+                              inventoryui::UIInventory &) {
+        if (item.getType().getId() == "minecraft:air") return;
+        auto copy = item;
+        if (const auto leftover =
+                clicker.getInventory().addItem(std::move(copy));
+            leftover.empty()) {
+            clicker.sendMessage("§a" + tran_->tr("Copied to your inventory"));
+        } else {
+            clicker.sendMessage("§c" + tran_->tr("Inventory full, cannot copy item"));
+        }
+    });
 
     menu->send_to(sender);
     return true;
@@ -529,6 +559,22 @@ bool Menu::showOfflinePlayerInventoryEncoded(endstone::Player &sender, const std
             }
 
             wi_free_encoded_inventory(encoded);
+
+            // 注册点击回调：复制物品到点击者背包
+            menu->set_listener([this](const endstone::Player &clicker, int,
+                                      const endstone::ItemStack &item,
+                                      inventoryui::UIInventory &) {
+                if (item.getType().getId() == "minecraft:air") return;
+                auto copy = item;
+                if (const auto leftover =
+                        clicker.getInventory().addItem(std::move(copy));
+                    leftover.empty()) {
+                    clicker.sendMessage("§a" + tran_->tr("Copied to your inventory"));
+                } else {
+                    clicker.sendMessage("§c" + tran_->tr("Inventory full, cannot copy item"));
+                }
+            });
+
             menu->send_to(sender);
             return true;
         }

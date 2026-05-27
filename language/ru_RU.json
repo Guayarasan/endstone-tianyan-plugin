@@ -141,5 +141,7 @@
   "Player {} not found (offline)": "Игрок {} не найден (оффлайн)",
   "Inventory is empty": "Инвентарь пуст",
   "Querying offline inventory...": "Запрос оффлайн инвентаря...",
-  "Tip: The player must have joined at least once to be cached.": "Подсказка: Игрок должен хотя бы раз зайти на сервер, чтобы быть кэшированным."
+  "Tip: The player must have joined at least once to be cached.": "Подсказка: Игрок должен хотя бы раз зайти на сервер, чтобы быть кэшированным.",
+  "Copied to your inventory": "Скопировано в ваш инвентарь",
+  "Inventory full, cannot copy item": "Инвентарь полон, невозможно скопировать предмет"
 }
