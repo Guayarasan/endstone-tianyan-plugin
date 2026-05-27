@@ -123,6 +123,19 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         ${RUST_MYSQL_SYSTEM_LIBS}
 )
 
+# Release 优化
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(${PROJECT_NAME} PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--gc-sections -Wl,--allow-multiple-definition)
+endif()
+
+# Release 构建后自动 strip
+if(RELEASE_VERSION)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND strip $<TARGET_FILE:${PROJECT_NAME}>
+        COMMENT "Stripping debug symbols from ${PROJECT_NAME}")
+endif()
+
 find_package(Git QUIET)
 if(GIT_FOUND)
     # 1. 查找最近的【纯净】正式版本 Tag (排除带 - 的 Tag)
