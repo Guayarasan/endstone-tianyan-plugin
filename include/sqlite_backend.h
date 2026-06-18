@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include "database.hpp"
 #include "database_util.h"
+#include <sqlite3.h>
 
 class SqliteBackend : public IDatabaseBackend {
 public:
@@ -40,7 +41,17 @@ public:
     bool updateStatusesByUUIDs(
         const std::vector<std::pair<std::string, std::string>>& pairs) override;
 
-    bool cleanDataBase(double hours) override;
+    int64_t getCleanCount(long long timestamp) override;
+
+    int deleteBatch(long long timestamp, int limit) override;
+
+    bool beginCleanup() override;
+    int cleanupDeleteBatch(long long timestamp, int limit) override;
+    bool cleanupCheckpoint() override;
+    bool abortCleanup() override;
+    bool endCleanup() override;
+
+    [[nodiscard]] bool isSqlite() const override { return true; }
 
     std::string generateUuid() override;
 
@@ -70,4 +81,5 @@ public:
 
 private:
     yuhangle::Database db_;
+    sqlite3* cleanup_db_ = nullptr;
 };

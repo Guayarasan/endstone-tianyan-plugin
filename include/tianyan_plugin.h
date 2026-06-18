@@ -47,6 +47,9 @@ public:
     //检查异步的数据库清理状态
     void checkDatabaseCleanStatus() const;
 
+    // 数据库清理
+    void runCleanup(double hours, const std::string& sender_name) const;
+
     //检查后台查询任务
     void checkAsyncTasks();
 
@@ -102,12 +105,14 @@ private:
     std::unique_ptr<TianyanProtect> protect_;
     std::unique_ptr<EventListener> eventListener_;
     std::unique_ptr<Menu> menu_;
-    string clean_data_sender_name;
     std::vector<AsyncQueryTask> async_tasks_;
     std::mutex async_tasks_mutex_;
     uint64_t next_task_id_ = 1;
     shared_ptr<endstone::Task> windows_print_webui_log;
     std::string db_type_ = "sqlite";
+    // 分批清理参数
+    static constexpr int CLEANUP_BATCH_SIZE = 100000;
+    static constexpr int CLEANUP_CHECKPOINT_INTERVAL = 50;
     std::vector<AsyncOfflineQueryTask> async_offline_tasks_;
     std::mutex async_offline_mutex_;
 #ifdef _WIN32

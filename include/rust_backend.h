@@ -52,7 +52,11 @@ public:
     bool updateStatusesByUUIDs(
         const std::vector<std::pair<std::string, std::string>>& pairs) override;
 
-    bool cleanDataBase(double hours) override;
+    int64_t getCleanCount(long long timestamp) override;
+
+    int deleteBatch(long long timestamp, int limit) override;
+
+    [[nodiscard]] bool isSqlite() const override { return false; }
 
     std::string generateUuid() override;
 

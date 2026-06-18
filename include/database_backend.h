@@ -66,7 +66,26 @@ public:
     virtual bool updateStatusesByUUIDs(
         const std::vector<std::pair<std::string, std::string>>& pairs) = 0;
 
-    virtual bool cleanDataBase(double hours) = 0;
+    virtual int64_t getCleanCount(long long timestamp) = 0;
+
+    virtual int deleteBatch(long long timestamp, int limit) = 0;
+
+    // 三阶段清理 API（SQLite 使用独立连接；MySQL 退化为 deleteBatch + no-op）
+    virtual bool beginCleanup() { return true; }
+
+    virtual int cleanupDeleteBatch(long long timestamp, int limit) {
+        return deleteBatch(timestamp, limit);
+    }
+
+    virtual bool cleanupCheckpoint() { return true; }
+
+    // checkpoint + 关连接，不做 VACUUM（小量清理跳过全库重建）
+    virtual bool abortCleanup() { return true; }
+
+    virtual bool endCleanup() { return true; }
+
+    // 供 runCleanup 判断是否需要 WAL checkpoint
+    [[nodiscard]] virtual bool isSqlite() const { return false; }
 
     virtual std::string generateUuid() = 0;
 

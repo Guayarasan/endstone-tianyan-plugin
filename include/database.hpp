@@ -19,12 +19,9 @@
 #include <mutex>
 #include <atomic>
 #include <queue>
+#include <condition_variable>
 
 namespace yuhangle {
-
-    //数据库清理输出语句缓存
-    inline std::vector<std::string> clean_data_message;
-    inline int clean_data_status;//0:未开始 1:成功 -1:失败 2:进行中
 
     class DatabaseConnection {
     public:
@@ -136,6 +133,7 @@ namespace yuhangle {
         }
 
         // 函数用于检查文件是否存在
+        [[nodiscard]] const std::string& getDbFilename() const { return db_filename; }
         static bool fileExists(const std::string& filename) {
             const std::ifstream f(filename.c_str());
             return f.good();
@@ -168,6 +166,8 @@ namespace yuhangle {
             sqlite3_exec(conn->get(), "CREATE INDEX IF NOT EXISTS idx_logdata_pos ON LOGDATA(pos_x, pos_y, pos_z)", nullptr, nullptr, nullptr);
             // 为时间范围查询创建索引
             sqlite3_exec(conn->get(), "CREATE INDEX IF NOT EXISTS idx_logdata_time ON LOGDATA(time)", nullptr, nullptr, nullptr);
+            // 复合索引：强制走 index cursor，避免全表扫描回退
+            sqlite3_exec(conn->get(), "CREATE INDEX IF NOT EXISTS idx_logdata_time_rowid ON LOGDATA(time, rowid)", nullptr, nullptr, nullptr);
 
             pool.returnConnection(conn);
             return SQLITE_OK;
@@ -228,98 +228,77 @@ namespace yuhangle {
             return rc;
         }
 
-        // 清理数据库中超过指定时间的数据
-        [[nodiscard]] bool cleanDataBase(double hours) const {
-            // 设置清理数据状态为进行中
-            clean_data_status = 2;
-            auto start_time = std::chrono::high_resolution_clock::now();
-
+        // 获取待清理的记录数（time < timestamp 的行数）
+        [[nodiscard]] int64_t getCleanCount(const long long timestamp) const {
             auto& pool = ConnectionPool::getInstance(db_filename);
-            auto conn = pool.getConnection();
+            const auto conn = pool.getConnection();
             sqlite3* db = conn->get();
 
-            // 获取当前时间戳（秒）
-            const long long currentTime = std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count();
-
-            // 计算时间阈值（秒）
-            const long long timeThreshold = currentTime - static_cast<long long>(hours * 3600);
-
-            // 查询将要删除的记录数
-            const std::string countSql = "SELECT COUNT(*) FROM LOGDATA WHERE time < " + std::to_string(timeThreshold) + ";";
-            sqlite3_stmt* countStmt;
-            int rc = sqlite3_prepare_v2(db, countSql.c_str(), -1, &countStmt, nullptr);
-            if (rc != SQLITE_OK) {
-                std::ostringstream ss;
-                ss << "SQL 预处理失败: " << sqlite3_errmsg(db);
-                clean_data_message.push_back(ss.str());
-                clean_data_status = -1;
-                return false;
+            const std::string sql = "SELECT COUNT(*) FROM LOGDATA WHERE time < ?;";
+            sqlite3_stmt* stmt;
+            if (const int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr); rc != SQLITE_OK) {
+                std::cerr << "getCleanCount prepare failed: " << sqlite3_errmsg(db) << std::endl;
+                sqlite3_finalize(stmt);
+                pool.returnConnection(conn);
+                return -1;
             }
 
-            int deletedCount = 0;
-            if (sqlite3_step(countStmt) == SQLITE_ROW) {
-                deletedCount = sqlite3_column_int(countStmt, 0);
-            }
-            sqlite3_finalize(countStmt);
+            sqlite3_bind_int64(stmt, 1, timestamp);
 
-            // 开始事务以提高性能
-            rc = sqlite3_exec(db, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
-            if (rc != SQLITE_OK) {
-                std::ostringstream ss;
-                ss << "Can not begin transaction: " << sqlite3_errmsg(db);
-                clean_data_message.push_back(ss.str());
-                clean_data_status = -1;
-                return false;
+            int64_t count = -1;
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                count = sqlite3_column_int64(stmt, 0);
             }
 
-            // 删除超过指定时间的数据
-            const std::string deleteSql = "DELETE FROM LOGDATA WHERE time < " + std::to_string(timeThreshold) + ";";
-            rc = sqlite3_exec(db, deleteSql.c_str(), nullptr, nullptr, nullptr);
-            if (rc != SQLITE_OK) {
-                std::ostringstream ss;
-                ss << "SQL delete failed: " << sqlite3_errmsg(db);
-                clean_data_message.push_back(ss.str());
-                sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
-                clean_data_status = -1;
-                return false;
-            }
-
-            // 提交事务
-            rc = sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
-            if (rc != SQLITE_OK) {
-                std::ostringstream ss;
-                ss << "Can not commit: " << sqlite3_errmsg(db);
-                clean_data_message.push_back(ss.str());
-                sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
-                clean_data_status = -1;
-                return false;
-            }
-
-            // 整理数据库以释放空间
-            rc = sqlite3_exec(db, "VACUUM;", nullptr, nullptr, nullptr);
-            if (rc != SQLITE_OK) {
-                std::ostringstream ss;
-                ss << "Database vacuum failed: " << sqlite3_errmsg(db);
-                clean_data_message.push_back(ss.str());
-                clean_data_status = -1;
-                return false;
-            }
-
-            // 计算耗时
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-            double seconds = std::chrono::duration_cast<std::chrono::duration<double>>(duration).count();
-
-            // 添加耗时和清理日志数信息
-            clean_data_message.emplace_back("Time elapsed: ");
-            clean_data_message.emplace_back(std::to_string(seconds));
-            clean_data_message.emplace_back("Number of cleaned logs: ");
-            clean_data_message.emplace_back(std::to_string(deletedCount));
-
-            clean_data_status = 1;
+            sqlite3_finalize(stmt);
             pool.returnConnection(conn);
-            return true;
+            return count;
+        }
+
+        // 分批删除：删除最多 limit 条 time < timestamp 的记录
+        // WAL checkpoint 由调用方（runCleanup）定期执行，此处不做
+        [[nodiscard]] int deleteBatch(long long timestamp, int limit) const {
+            if (limit <= 0) return 0;
+
+            auto& pool = ConnectionPool::getInstance(db_filename);
+            const auto conn = pool.getConnection();
+            sqlite3* db = conn->get();
+
+            // 使用 rowid IN (子查询) 分批删除，避免 SQLITE_ENABLE_UPDATE_DELETE_LIMIT 依赖。
+            // rowid 是 B-tree 主键，整数查询比 uuid TEXT 快，且省去临时 hash 表。
+            // ORDER BY time, rowid 强制走 idx_logdata_time_rowid 复合索引的 B-tree 顺序扫描，
+            // 确保子查询只读 N 条索引叶节点，不回退到全表扫描。
+            const std::string sql =
+                "DELETE FROM LOGDATA WHERE rowid IN ("
+                "SELECT rowid FROM LOGDATA WHERE time < ? "
+                "ORDER BY time, rowid LIMIT ?"
+                ");";
+
+            sqlite3_stmt* stmt;
+            int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+            if (rc != SQLITE_OK) {
+                std::cerr << "deleteBatch prepare failed: " << sqlite3_errmsg(db) << std::endl;
+                sqlite3_finalize(stmt);
+                pool.returnConnection(conn);
+                return -1;
+            }
+
+            sqlite3_bind_int64(stmt, 1, timestamp);
+            sqlite3_bind_int(stmt, 2, limit);
+
+            rc = sqlite3_step(stmt);
+            if (rc != SQLITE_DONE) {
+                std::cerr << "deleteBatch step failed: " << sqlite3_errmsg(db) << std::endl;
+                sqlite3_finalize(stmt);
+                pool.returnConnection(conn);
+                return -1;
+            }
+
+            const int deleted = sqlite3_changes(db);
+            sqlite3_finalize(stmt);
+
+            pool.returnConnection(conn);
+            return deleted;
         }
 
         // 查找指定表中是否存在指定值
@@ -438,6 +417,7 @@ namespace yuhangle {
             int rc = sqlite3_exec(db, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
             if (rc != SQLITE_OK) {
                 std::cerr << "无法开始事务: " << sqlite3_errmsg(db) << std::endl;
+                pool.returnConnection(conn);
                 return false;
             }
 
@@ -447,6 +427,7 @@ namespace yuhangle {
             rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
             if (rc != SQLITE_OK) {
                 std::cerr << "SQL 预处理失败: " << sqlite3_errmsg(db) << std::endl;
+                pool.returnConnection(conn);
                 return false;
             }
 
@@ -462,6 +443,7 @@ namespace yuhangle {
                     std::cerr << "SQL 更新失败: " << sqlite3_errmsg(db) << std::endl;
                     sqlite3_finalize(stmt);
                     sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+                    pool.returnConnection(conn);
                     return false;
                 }
 

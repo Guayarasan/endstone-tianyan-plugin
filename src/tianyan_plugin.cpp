@@ -436,6 +436,15 @@ void TianyanPlugin::onEnable()
         default_init_sqlite_();
     }
 
+    // 清理上次可能的残留清理状态（服务端意外退出时遗留）
+    if (yuhangle::clean_data_status == 2) {
+        yuhangle::clean_data_status = 0;
+        yuhangle::clean_data_message.clear();
+        yuhangle::clean_data_sender_name.clear();
+        yuhangle::clean_data_total = 0;
+        yuhangle::clean_data_progress = 0;
+    }
+
     // 创建核心逻辑层
     tyCore = std::make_unique<TianyanCore>(*db_backend_);
 
@@ -838,10 +847,9 @@ bool TianyanPlugin::onCommand(endstone::CommandSender &sender, const endstone::C
                 return false;
             }
             int hours = db_util::stringToInt(args[0]);
-            clean_data_sender_name = sender.getName();
             sender.sendMessage(endstone::ColorFormat::Yellow+Tran->tr(Tran->getLocal("Start cleaning logs older than {} hours"), args[0]));
-            std::thread clean_thread([this,hours]() {
-                (void)db_backend_->cleanDataBase(hours);
+            std::thread clean_thread([this, hours, sender_name = sender.getName()]() {
+                runCleanup(hours, sender_name);
             });
             clean_thread.detach();
         }
@@ -1247,43 +1255,142 @@ void TianyanPlugin::logsCacheWrite() const
     logsCacheWrite_thread.detach();
 }
 
+void TianyanPlugin::runCleanup(const double hours, const std::string& sender_name) const
+{
+    // 设置清理状态
+    yuhangle::clean_data_status = 2;
+    yuhangle::clean_data_sender_name = sender_name;
+    yuhangle::clean_data_message.clear();
+    yuhangle::clean_data_progress = 0;
+    yuhangle::clean_data_total = 0;
+
+    // 计算时间阈值（秒）
+    const long long current_time = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    const long long threshold = current_time - static_cast<long long>(hours * 3600);
+
+    try {
+        // 统计待删除行数
+        const int64_t to_delete = db_backend_->getCleanCount(threshold);
+        if (to_delete < 0) {
+            yuhangle::clean_data_status = -1;
+            yuhangle::clean_data_message = {"Failed to count rows for cleanup"};
+            return;
+        }
+        if (to_delete == 0) {
+            yuhangle::clean_data_message = {"Time elapsed: ", "0", "Number of cleaned logs: ", "0"};
+            yuhangle::clean_data_status = 1;
+            return;
+        }
+
+        yuhangle::clean_data_total = to_delete;
+        const auto start_time = std::chrono::high_resolution_clock::now();
+
+        // 进入清理模式（SQLite 开独立连接，MySQL 退化为 pool）
+        if (!db_backend_->beginCleanup()) {
+            yuhangle::clean_data_status = -1;
+            yuhangle::clean_data_message = {"Failed to open cleanup connection"};
+            return;
+        }
+
+        // 分批 DELETE
+        int64_t total_deleted = 0;
+        int batch_count = 0;
+        while (total_deleted < to_delete) {
+            const int deleted = db_backend_->cleanupDeleteBatch(threshold, CLEANUP_BATCH_SIZE);
+            if (deleted < 0) {
+                yuhangle::clean_data_status = -1;
+                yuhangle::clean_data_message = {
+                    "Batch delete failed after deleting " +
+                    std::to_string(total_deleted) + " rows"};
+                return;
+            }
+            if (deleted == 0) break;
+
+            total_deleted += deleted;
+            yuhangle::clean_data_progress = total_deleted;
+            batch_count++;
+
+            if (batch_count % CLEANUP_CHECKPOINT_INTERVAL == 0) {
+                db_backend_->cleanupCheckpoint();
+            }
+        }
+
+        // 结束清理（VACUUM 或只 checkpoint）
+        if (total_deleted > 0) {
+            if (total_deleted >= 100000) {
+                db_backend_->endCleanup();
+            } else {
+                db_backend_->abortCleanup();
+            }
+        }
+
+        const auto end_time = std::chrono::high_resolution_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            end_time - start_time);
+        const double seconds = std::chrono::duration<double>(duration).count();
+
+        yuhangle::clean_data_message = {
+            "Time elapsed: ", std::to_string(seconds),
+            "Number of cleaned logs: ", std::to_string(total_deleted)
+        };
+        yuhangle::clean_data_status = 1;
+
+    } catch (const std::exception& e) {
+        yuhangle::clean_data_status = -1;
+        yuhangle::clean_data_message = {"Cleanup exception: " + std::string(e.what())};
+    }
+}
+
 //检查异步的数据库清理状态
 void TianyanPlugin::checkDatabaseCleanStatus() const {
-    if (yuhangle::clean_data_status == 0) {
+    const int status = yuhangle::clean_data_status.load();
+    if (status == 0) return;
+
+    const auto player = getServer().getPlayer(yuhangle::clean_data_sender_name);
+    const auto green = endstone::ColorFormat::Green;
+
+    if (status == 2) {
         return;
     }
-    const auto player = getServer().getPlayer(clean_data_sender_name);
-    const auto green = endstone::ColorFormat::Green;
-    if (yuhangle::clean_data_status == 1) {
-        if (clean_data_sender_name!="Server" && player) {
-            player->sendMessage(green+Tran->getLocal("Database clean over"));
-            player->sendMessage(green+Tran->getLocal(yuhangle::clean_data_message[0]) + yuhangle::clean_data_message[1] + "s");
-            player->sendMessage(green+Tran->getLocal(yuhangle::clean_data_message[2])+yuhangle::clean_data_message[3]);
-            getLogger().info(green+Tran->getLocal("Database clean over"));
-            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[0]) + yuhangle::clean_data_message[1] + "s");
-            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[2])+yuhangle::clean_data_message[3]);
-        } else {
-            getLogger().info(green+Tran->getLocal("Database clean over"));
-            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[0]) + yuhangle::clean_data_message[1] + "s");
-            getLogger().info(green+Tran->getLocal(yuhangle::clean_data_message[2])+yuhangle::clean_data_message[3]);
+
+    if (status == 1) {
+        // 成功
+        const auto& msg = yuhangle::clean_data_message;
+        const std::string elapsed = msg.size() > 1 ? msg[1] : "0";
+        const std::string count = msg.size() > 3 ? msg[3] : "0";
+
+        if (player && yuhangle::clean_data_sender_name != "Server") {
+            player->sendMessage(green + Tran->getLocal("Database clean over"));
+            player->sendMessage(green + Tran->getLocal("Time elapsed: ") + elapsed + "s");
+            player->sendMessage(green + Tran->getLocal("Number of cleaned logs: ") + count);
         }
-    } else if (yuhangle::clean_data_status == -1) {
-        if (clean_data_sender_name!="Server" && player) {
+        getLogger().info(green + Tran->getLocal("Database clean over"));
+        getLogger().info(green + Tran->getLocal("Time elapsed: ") + elapsed + "s");
+        getLogger().info(green + Tran->getLocal("Number of cleaned logs: ") + count);
+
+    } else if (status == -1) {
+        // 失败
+        if (player && yuhangle::clean_data_sender_name != "Server") {
             player->sendErrorMessage(Tran->getLocal("Database clean error"));
-            getLogger().error(Tran->getLocal("Database clean error"));
-            for (const string& info : yuhangle::clean_data_message) {
+            for (const auto& info : yuhangle::clean_data_message) {
                 player->sendErrorMessage(info);
                 getLogger().error(info);
             }
         } else {
             getLogger().error(Tran->getLocal("Database clean error"));
-            for (const string& info : yuhangle::clean_data_message) {
+            for (const auto& info : yuhangle::clean_data_message) {
                 getLogger().error(info);
             }
         }
     }
+
+    // 重置状态
     yuhangle::clean_data_status = 0;
     yuhangle::clean_data_message.clear();
+    yuhangle::clean_data_sender_name.clear();
+    yuhangle::clean_data_total = 0;
+    yuhangle::clean_data_progress = 0;
 }
 
 //检查后台查询任务

@@ -393,59 +393,47 @@ bool RustBackend::updateStatusesByUUIDs(
     return true;
 }
 
-bool RustBackend::cleanDataBase(double hours) {
-    if (!handle_) return false;
+int64_t RustBackend::getCleanCount(long long timestamp) {
+    if (!handle_) return -1;
 
-    yuhangle::clean_data_status = 2;
-    auto start_time = std::chrono::high_resolution_clock::now();
+    std::vector<std::map<std::string, std::string>> result;
+    int rc = queryToMaps(
+        "SELECT COUNT(*) AS cnt FROM LOGDATA WHERE time < ?",
+        result, {std::to_string(timestamp)});
 
-    const long long current_time = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
-    const long long threshold = current_time - static_cast<long long>(hours * 3600);
-    const std::string threshold_str = std::to_string(threshold);
-
-    // Count rows to be deleted
-    std::vector<std::map<std::string, std::string>> count_result;
-    if (queryToMaps(
-            "SELECT COUNT(*) AS cnt FROM LOGDATA WHERE time < ?",
-            count_result, {threshold_str}) != 0) {
-        yuhangle::clean_data_status = -1;
-        return false;
+    if (rc != 0 || result.empty()) return -1;
+    auto it = result[0].find("cnt");
+    if (it == result[0].end()) return -1;
+    try {
+        return std::stoll(it->second);
+    } catch (...) {
+        return -1;
     }
+}
 
-    int deleted_count = 0;
-    if (!count_result.empty()) {
-        auto it = count_result[0].find("cnt");
-        if (it != count_result[0].end()) {
-            deleted_count = std::stoi(it->second);
-        }
-    }
+int RustBackend::deleteBatch(long long timestamp, int limit) {
+    if (limit <= 0) return 0;
+    if (!handle_) return -1;
 
-    // Delete old rows
-    const std::vector<const char*> c_params = {threshold_str.c_str()};
-    const int64_t affected = rust_mysql_execute_params(
-        handle_, "DELETE FROM LOGDATA WHERE time < ?",
-        c_params.data(), 1);
+    // MySQL supports DELETE ... LIMIT natively.
+    // Build persistent strings before C string array to avoid dangling pointers.
+    std::string ts_str = std::to_string(timestamp);
+    std::string lim_str = std::to_string(limit);
+
+    std::vector<const char*> c_params = {ts_str.c_str(), lim_str.c_str()};
+
+    int64_t affected = rust_mysql_execute_params(
+        handle_,
+        "DELETE FROM LOGDATA WHERE time < ? LIMIT ?",
+        c_params.data(),
+        static_cast<int32_t>(c_params.size()));
 
     if (affected < 0) {
-        yuhangle::clean_data_message.clear();
-        yuhangle::clean_data_message.emplace_back("MySQL delete failed");
-        yuhangle::clean_data_status = -1;
-        return false;
+        std::cerr << "[Tianyan][RustMySQL] deleteBatch failed: "
+                  << lastError() << std::endl;
+        return -1;
     }
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    double seconds = std::chrono::duration<double>(duration).count();
-
-    yuhangle::clean_data_message.clear();
-    yuhangle::clean_data_message.emplace_back("Time elapsed: ");
-    yuhangle::clean_data_message.emplace_back(std::to_string(seconds));
-    yuhangle::clean_data_message.emplace_back("Number of cleaned logs: ");
-    yuhangle::clean_data_message.emplace_back(std::to_string(deleted_count));
-
-    yuhangle::clean_data_status = 1;
-    return true;
+    return static_cast<int>(affected);
 }
 
 std::string RustBackend::generateUuid() {
